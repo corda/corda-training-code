@@ -1,18 +1,17 @@
 package com.template.states;
 
-import com.template.contracts.TemplateContract;
+import com.template.contracts.TokenContract;
 import net.corda.core.contracts.BelongsToContract;
 import net.corda.core.contracts.ContractState;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.Party;
-import org.apache.commons.lang3.ObjectUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-@BelongsToContract(TemplateContract.class)
+@BelongsToContract(TokenContract.class)
 public final class TokenState implements ContractState {
 
     @NotNull
@@ -65,5 +64,14 @@ public final class TokenState implements ContractState {
     @Override
     public int hashCode() {
         return Objects.hash(issuer, owner, amount);
+    }
+
+    @Override
+    public String toString() {
+        return "TokenState{" +
+                "issuer=" + issuer +
+                ", owner=" + owner +
+                ", amount=" + amount +
+                '}';
     }
 }
