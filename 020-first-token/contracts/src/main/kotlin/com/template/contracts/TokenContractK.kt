@@ -34,11 +34,25 @@ class TokenContractK : Contract {
                 // We assume the owners need not sign although they are participants.
             }
 
+            is Commands.Redeem -> requireThat {
+                // Constraints on the shape of the transaction.
+                "There should be tokens to redeem." using inputs.isNotEmpty()
+                "No tokens should be minted when redeeming." using outputs.isEmpty()
+
+                // Constraints on the redeemed tokens themselves.
+                // The "above 0" constraint is enforced at the constructor level.
+
+                // Constraints on the signers.
+                "The issuers should sign." using command.signers.containsAll(inputs.map { it.issuer.owningKey }.distinct())
+                "The holders should sign." using command.signers.containsAll(inputs.map { it.holder.owningKey }.distinct())
+            }
+
             else -> throw IllegalArgumentException("Unknown command ${command.value}.")
         }
     }
 
     interface Commands : CommandData {
         class Mint : Commands
+        class Redeem : Commands
     }
 }

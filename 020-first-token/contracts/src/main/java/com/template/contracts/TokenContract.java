@@ -45,6 +45,31 @@ public class TokenContract implements Contract {
 
                 return null;
             });
+        } else if (command.getValue() instanceof Commands.Redeem) {
+            requireThat(req -> {
+                // Constraints on the shape of the transaction.
+                req.using("There should be tokens to redeem.", !inputs.isEmpty());
+                req.using("No tokens should be minted when redeeming.", outputs.isEmpty());
+
+                // Constraints on the redeemed tokens themselves.
+                // The "above 0" constraint is enforced at the constructor level.
+
+                // Constraints on the signers.
+                req.using("The issuers should sign.",
+                        command.getSigners().containsAll(inputs.stream()
+                                .map(it -> it.getIssuer().getOwningKey())
+                                .distinct()
+                                .collect(Collectors.toList())
+                        ));
+                req.using("The holders should sign.",
+                        command.getSigners().containsAll(inputs.stream()
+                                .map(it -> it.getHolder().getOwningKey())
+                                .distinct()
+                                .collect(Collectors.toList())
+                        ));
+
+                return null;
+            });
         } else {
             throw new IllegalArgumentException("Unknown command " + command.getValue());
         }
@@ -52,6 +77,9 @@ public class TokenContract implements Contract {
 
     public interface Commands extends CommandData {
         class Mint implements Commands {
+        }
+
+        class Redeem implements Commands {
         }
     }
 }
