@@ -25,13 +25,13 @@ public class TokenContract implements Contract {
         final List<TokenState> inputs = tx.inputsOfType(TokenState.class);
         final List<TokenState> outputs = tx.outputsOfType(TokenState.class);
 
-        if (command.getValue() instanceof Commands.Mint) {
+        if (command.getValue() instanceof Commands.Issue) {
             requireThat(req -> {
                 // Constraints on the shape of the transaction.
-                req.using("No tokens should be consumed when minting.", inputs.isEmpty());
-                req.using("There should be minted tokens.", !outputs.isEmpty());
+                req.using("No tokens should be consumed when issuing.", inputs.isEmpty());
+                req.using("There should be issued tokens.", !outputs.isEmpty());
 
-                // Constraints on the minted tokens themselves.
+                // Constraints on the issued tokens themselves.
                 // The "above 0" constraint is enforced at the constructor level.
 
                 // Constraints on the signers.
@@ -49,7 +49,7 @@ public class TokenContract implements Contract {
             requireThat(req -> {
                 // Constraints on the shape of the transaction.
                 req.using("There should be tokens to redeem.", !inputs.isEmpty());
-                req.using("No tokens should be minted when redeeming.", outputs.isEmpty());
+                req.using("No tokens should be issued when redeeming.", outputs.isEmpty());
 
                 // Constraints on the redeemed tokens themselves.
                 // The "above 0" constraint is enforced at the constructor level.
@@ -76,7 +76,7 @@ public class TokenContract implements Contract {
     }
 
     public interface Commands extends CommandData {
-        class Mint implements Commands {
+        class Issue implements Commands {
         }
 
         class Redeem implements Commands {

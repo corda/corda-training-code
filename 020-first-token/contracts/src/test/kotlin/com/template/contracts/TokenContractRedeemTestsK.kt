@@ -37,7 +37,7 @@ class TokenContractRedeemTestsK {
                 input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
                 output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 10L))
                 command(listOf(alice.publicKey, bob.publicKey), TokenContractK.Commands.Redeem())
-                `fails with`("No tokens should be minted when redeeming.")
+                `fails with`("No tokens should be issued when redeeming.")
             }
         }
     }

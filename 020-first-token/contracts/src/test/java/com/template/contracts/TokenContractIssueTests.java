@@ -12,7 +12,7 @@ import org.junit.Test;
 import static com.template.contracts.TokenContract.TOKEN_CONTRACT_ID;
 import static net.corda.testing.node.NodeTestUtils.transaction;
 
-public class TokenContractMintTests {
+public class TokenContractIssueTests {
     private final MockServices ledgerServices = new MockServices();
     private final TestIdentity alice = new TestIdentity(new CordaX500Name("Alice", "London", "GB"));
     private final TestIdentity bob = new TestIdentity(new CordaX500Name("Bob", "New York", "US"));
@@ -24,63 +24,63 @@ public class TokenContractMintTests {
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.command(alice.getPublicKey(), new DummyContract.Commands.Create());
             tx.failsWith("Required com.template.contracts.TokenContract.Commands command");
-            tx.command(alice.getPublicKey(), new TokenContract.Commands.Mint());
+            tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
             tx.verifies();
             return null;
         });
     }
 
     @Test
-    public void mintTransactionMustHaveNoInputs() {
+    public void issueTransactionMustHaveNoInputs() {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.command(alice.getPublicKey(), new TokenContract.Commands.Mint());
-            tx.failsWith("No tokens should be consumed when minting.");
+            tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
+            tx.failsWith("No tokens should be consumed when issuing.");
             return null;
         });
     }
 
     @Test
-    public void mintTransactionMustHaveOutputs() {
+    public void issueTransactionMustHaveOutputs() {
         transaction(ledgerServices, tx -> {
             tx.output(TOKEN_CONTRACT_ID, new DummyState());
-            tx.command(alice.getPublicKey(), new TokenContract.Commands.Mint());
-            tx.failsWith("There should be minted tokens.");
+            tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
+            tx.failsWith("There should be issued tokens.");
             return null;
         });
     }
 
     @Test
-    public void issuerMustSignMintTransaction() {
+    public void issuerMustSignIssueTransaction() {
         transaction(ledgerServices, tx -> {
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.command(bob.getPublicKey(), new TokenContract.Commands.Mint());
+            tx.command(bob.getPublicKey(), new TokenContract.Commands.Issue());
             tx.failsWith("The issuers should sign.");
             return null;
         });
     }
 
     @Test
-    public void allIssuersMustSignMintTransaction() {
+    public void allIssuersMustSignIssueTransaction() {
         transaction(ledgerServices, tx -> {
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
-            tx.command(alice.getPublicKey(), new TokenContract.Commands.Mint());
+            tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
             tx.failsWith("The issuers should sign.");
             return null;
         });
     }
 
     @Test
-    public void canHaveDifferentIssuersInMintTransaction() {
+    public void canHaveDifferentIssuersInIssueTransaction() {
         transaction(ledgerServices, tx -> {
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), alice.getParty(), 20L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 30L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), alice.getParty(), 20L));
-            tx.command(List.of(alice.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Mint());
+            tx.command(List.of(alice.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Issue());
             tx.verifies();
             return null;
         });

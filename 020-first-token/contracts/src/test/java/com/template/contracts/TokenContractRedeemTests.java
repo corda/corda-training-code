@@ -36,7 +36,7 @@ public class TokenContractRedeemTests {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.command(List.of(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
-            tx.failsWith("No tokens should be minted when redeeming.");
+            tx.failsWith("No tokens should be issued when redeeming.");
             return null;
         });
     }

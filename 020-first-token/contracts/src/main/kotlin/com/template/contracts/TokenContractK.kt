@@ -21,23 +21,23 @@ class TokenContractK : Contract {
         val outputs = tx.outputsOfType<TokenStateK>()
 
         when (command.value) {
-            is Commands.Mint -> requireThat {
+            is Commands.Issue -> requireThat {
                 // Constraints on the shape of the transaction.
-                "No tokens should be consumed when minting." using inputs.isEmpty()
-                "There should be minted tokens." using outputs.isNotEmpty()
+                "No tokens should be consumed when issuing." using inputs.isEmpty()
+                "There should be issued tokens." using outputs.isNotEmpty()
 
-                // Constraints on the minted tokens themselves.
+                // Constraints on the issued tokens themselves.
                 // The "above 0" constraint is enforced at the constructor level.
 
                 // Constraints on the signers.
                 "The issuers should sign." using command.signers.containsAll(outputs.map { it.issuer.owningKey }.distinct())
-                // We assume the owners need not sign although they are participants.
+                // We assume the holders need not sign although they are participants.
             }
 
             is Commands.Redeem -> requireThat {
                 // Constraints on the shape of the transaction.
                 "There should be tokens to redeem." using inputs.isNotEmpty()
-                "No tokens should be minted when redeeming." using outputs.isEmpty()
+                "No tokens should be issued when redeeming." using outputs.isEmpty()
 
                 // Constraints on the redeemed tokens themselves.
                 // The "above 0" constraint is enforced at the constructor level.
@@ -52,7 +52,7 @@ class TokenContractK : Contract {
     }
 
     interface Commands : CommandData {
-        class Mint : Commands
+        class Issue : Commands
         class Redeem : Commands
     }
 }
