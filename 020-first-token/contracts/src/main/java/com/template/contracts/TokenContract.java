@@ -1,13 +1,16 @@
 package com.template.contracts;
 
 import com.template.states.TokenState;
+import com.template.states.TokenStateUtilities;
 import net.corda.core.contracts.CommandData;
 import net.corda.core.contracts.CommandWithParties;
 import net.corda.core.contracts.Contract;
+import net.corda.core.identity.Party;
 import net.corda.core.transactions.LedgerTransaction;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static net.corda.core.contracts.ContractsDSL.requireSingleCommand;
@@ -45,6 +48,34 @@ public class TokenContract implements Contract {
 
                 return null;
             });
+        } else if (command.getValue() instanceof Commands.Move) {
+            requireThat(req -> {
+                // Constraints on the shape of the transaction.
+                req.using("There should be tokens to move.", !inputs.isEmpty());
+                req.using("There should be moved tokens.", !outputs.isEmpty());
+
+                // Constraints on the redeemed tokens themselves.
+                // The "above 0" constraint is enforced at the constructor level.
+                Map<Party, Long> inputSums = TokenStateUtilities.mapSumByIssuer(inputs);
+                Map<Party, Long> outputSums = TokenStateUtilities.mapSumByIssuer(outputs);
+                req.using(
+                        "Consumed and created issuers should be identical.",
+                        inputSums.keySet().equals(outputSums.keySet()));
+                req.using(
+                        "The sum of quantities for each issuer should be conserved.",
+                        inputSums.entrySet().stream()
+                                .allMatch(entry -> outputSums.get(entry.getKey()).equals(entry.getValue())));
+
+                // Constraints on the signers.
+                req.using("The holders should sign.",
+                        command.getSigners().containsAll(inputs.stream()
+                                .map(it -> it.getHolder().getOwningKey())
+                                .distinct()
+                                .collect(Collectors.toList())
+                        ));
+
+                return null;
+            });
         } else if (command.getValue() instanceof Commands.Redeem) {
             requireThat(req -> {
                 // Constraints on the shape of the transaction.
@@ -77,6 +108,9 @@ public class TokenContract implements Contract {
 
     public interface Commands extends CommandData {
         class Issue implements Commands {
+        }
+
+        class Move implements Commands {
         }
 
         class Redeem implements Commands {

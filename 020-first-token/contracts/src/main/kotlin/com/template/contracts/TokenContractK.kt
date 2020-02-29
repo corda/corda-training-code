@@ -1,6 +1,7 @@
 package com.template.contracts
 
 import com.template.states.TokenStateK
+import com.template.states.mapSumByIssuer
 import net.corda.core.contracts.CommandData
 import net.corda.core.contracts.Contract
 import net.corda.core.contracts.requireSingleCommand
@@ -34,6 +35,22 @@ class TokenContractK : Contract {
                 // We assume the holders need not sign although they are participants.
             }
 
+            is Commands.Move -> requireThat {
+                // Constraints on the shape of the transaction.
+                "There should be tokens to move." using inputs.isNotEmpty()
+                "There should be moved tokens." using outputs.isNotEmpty()
+
+                // Constraints on the moved tokens themselves.
+                // The "above 0" constraint is enforced at the constructor level.
+                val inputSums = inputs.mapSumByIssuer()
+                val outputSums = outputs.mapSumByIssuer()
+                "Consumed and created issuers should be identical." using (inputSums.keys == outputSums.keys)
+                "The sum of quantities for each issuer should be conserved." using inputSums.all { outputSums[it.key] == it.value }
+
+                // Constraints on the signers.
+                "The holders should sign." using command.signers.containsAll(inputs.map { it.holder.owningKey }.distinct())
+            }
+
             is Commands.Redeem -> requireThat {
                 // Constraints on the shape of the transaction.
                 "There should be tokens to redeem." using inputs.isNotEmpty()
@@ -53,6 +70,7 @@ class TokenContractK : Contract {
 
     interface Commands : CommandData {
         class Issue : Commands
+        class Move : Commands
         class Redeem : Commands
     }
 }

@@ -85,4 +85,5 @@ public class TokenContractIssueTests {
             return null;
         });
     }
+
 }
