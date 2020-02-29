@@ -40,8 +40,8 @@ public class TokenStateTests {
     public void constructorAndGettersAreWorking() {
         final TokenState state = new TokenState(alice, bob, 2L);
         assertEquals(alice, state.getIssuer());
-        assertEquals(bob, state.getOwner());
-        assertEquals(2L, state.getAmount());
+        assertEquals(bob, state.getHolder());
+        assertEquals(2L, state.getQuantity());
     }
 
     @Test

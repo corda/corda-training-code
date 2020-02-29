@@ -17,24 +17,24 @@ public final class TokenState implements ContractState {
     @NotNull
     private final Party issuer;
     @NotNull
-    private final Party owner;
-    private final long amount;
+    private final Party holder;
+    private final long quantity;
 
-    public TokenState(@NotNull Party issuer, @NotNull Party owner, long amount) {
+    public TokenState(@NotNull Party issuer, @NotNull Party holder, long quantity) {
         //noinspection ConstantConditions
         if (issuer == null) throw new NullPointerException("issuer cannot be null");
         //noinspection ConstantConditions
-        if (owner == null) throw new NullPointerException("owner cannot be null");
+        if (holder == null) throw new NullPointerException("holder cannot be null");
         this.issuer = issuer;
-        this.owner = owner;
-        if (amount <= 0) throw new IllegalArgumentException("amount must be above 0");
-        this.amount = amount;
+        this.holder = holder;
+        if (quantity <= 0) throw new IllegalArgumentException("quantity must be above 0");
+        this.quantity = quantity;
     }
 
     @NotNull
     @Override
     public List<AbstractParty> getParticipants() {
-        return Collections.singletonList(owner);
+        return Collections.singletonList(holder);
     }
 
     @NotNull
@@ -43,12 +43,12 @@ public final class TokenState implements ContractState {
     }
 
     @NotNull
-    public Party getOwner() {
-        return owner;
+    public Party getHolder() {
+        return holder;
     }
 
-    public long getAmount() {
-        return amount;
+    public long getQuantity() {
+        return quantity;
     }
 
     @Override
@@ -56,22 +56,22 @@ public final class TokenState implements ContractState {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         TokenState that = (TokenState) o;
-        return amount == that.amount &&
+        return quantity == that.quantity &&
                 issuer.equals(that.issuer) &&
-                owner.equals(that.owner);
+                holder.equals(that.holder);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(issuer, owner, amount);
+        return Objects.hash(issuer, holder, quantity);
     }
 
     @Override
     public String toString() {
         return "TokenState{" +
                 "issuer=" + issuer +
-                ", owner=" + owner +
-                ", amount=" + amount +
+                ", holder=" + holder +
+                ", quantity=" + quantity +
                 '}';
     }
 }
