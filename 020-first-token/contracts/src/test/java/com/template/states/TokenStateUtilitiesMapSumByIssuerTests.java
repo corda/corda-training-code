@@ -19,14 +19,14 @@ public class TokenStateUtilitiesMapSumByIssuerTests {
 
     @Test
     public void mapSumByIssuerGetsSameValueOnSingleton() {
-        Map<Party, Long> mappedSums = mapSumByIssuer(List.of(new TokenState(alice, bob, 10)));
+        final Map<Party, Long> mappedSums = mapSumByIssuer(List.of(new TokenState(alice, bob, 10)));
         assertEquals(1, mappedSums.size());
         assertEquals(10L, mappedSums.get(alice).longValue());
     }
 
     @Test
     public void mapSumByIssuerGetsSumOnUniqueIssuer() {
-        Map<Party, Long> mappedSums = mapSumByIssuer(List.of(
+        final Map<Party, Long> mappedSums = mapSumByIssuer(List.of(
                 new TokenState(alice, bob, 10),
                 new TokenState(alice, carly, 15)));
         assertEquals(1, mappedSums.size());
@@ -35,7 +35,7 @@ public class TokenStateUtilitiesMapSumByIssuerTests {
 
     @Test
     public void mapSumByIssuerGetsSumForEachIssuer() {
-        Map<Party, Long> mappedSums = mapSumByIssuer(List.of(
+        final Map<Party, Long> mappedSums = mapSumByIssuer(List.of(
                 new TokenState(alice, bob, 10),
                 new TokenState(alice, carly, 15),
                 new TokenState(carly, bob, 30),
@@ -51,6 +51,13 @@ public class TokenStateUtilitiesMapSumByIssuerTests {
         mapSumByIssuer(List.of(
                 new TokenState(alice, bob, Long.MAX_VALUE),
                 new TokenState(alice, carly, 1)));
+    }
+
+    @Test(expected = UnsupportedOperationException.class)
+    public void mapSumByIssuerIsImmutable() {
+        final Map<Party, Long> mappedSums = mapSumByIssuer(List.of(new TokenState(alice, bob, 10)));
+        //noinspection ConstantConditions
+        mappedSums.put(alice, 20L);
     }
 
 }

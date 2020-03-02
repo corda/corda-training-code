@@ -44,10 +44,15 @@ class TokenStateUtilitiesMapSumByIssuerTestsK {
     }
 
     @Test(expected = ArithmeticException::class)
-    fun `Overflow triggers error in mapSumByIssuer`() {
+    fun `overflow triggers error in mapSumByIssuer`() {
         listOf(TokenStateK(alice, bob, Long.MAX_VALUE),
                 TokenStateK(alice, carly, 1))
                 .mapSumByIssuer()
     }
 
+    @Test(expected = UnsupportedOperationException::class)
+    fun `mapSumByIssuer is immutable`() {
+        val mappedSums = listOf(TokenStateK(alice, bob, 10)).mapSumByIssuer() as MutableMap
+        mappedSums[alice] = 20L
+    }
 }

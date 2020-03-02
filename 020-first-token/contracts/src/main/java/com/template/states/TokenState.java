@@ -20,7 +20,7 @@ public final class TokenState implements ContractState {
     private final Party holder;
     private final long quantity;
 
-    public TokenState(@NotNull Party issuer, @NotNull Party holder, long quantity) {
+    public TokenState(@NotNull final Party issuer, @NotNull final Party holder, final long quantity) {
         //noinspection ConstantConditions
         if (issuer == null) throw new NullPointerException("issuer cannot be null");
         //noinspection ConstantConditions
@@ -52,10 +52,10 @@ public final class TokenState implements ContractState {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        TokenState that = (TokenState) o;
+        final TokenState that = (TokenState) o;
         return quantity == that.quantity &&
                 issuer.equals(that.issuer) &&
                 holder.equals(that.holder);

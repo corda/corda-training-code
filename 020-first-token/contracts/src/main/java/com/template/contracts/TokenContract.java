@@ -56,8 +56,8 @@ public class TokenContract implements Contract {
 
                 // Constraints on the redeemed tokens themselves.
                 // The "above 0" constraint is enforced at the constructor level.
-                Map<Party, Long> inputSums = TokenStateUtilities.mapSumByIssuer(inputs);
-                Map<Party, Long> outputSums = TokenStateUtilities.mapSumByIssuer(outputs);
+                final Map<Party, Long> inputSums = TokenStateUtilities.mapSumByIssuer(inputs);
+                final Map<Party, Long> outputSums = TokenStateUtilities.mapSumByIssuer(outputs);
                 req.using(
                         "Consumed and created issuers should be identical.",
                         inputSums.keySet().equals(outputSums.keySet()));
