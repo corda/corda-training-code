@@ -1,6 +1,5 @@
 package com.template.contracts;
 
-import com.sun.tools.javac.util.List;
 import com.template.states.TokenState;
 import kotlin.NotImplementedError;
 import net.corda.core.identity.CordaX500Name;
@@ -8,6 +7,8 @@ import net.corda.testing.contracts.DummyContract;
 import net.corda.testing.core.TestIdentity;
 import net.corda.testing.node.MockServices;
 import org.junit.Test;
+
+import java.util.Arrays;
 
 import static com.template.contracts.TokenContract.TOKEN_CONTRACT_ID;
 import static net.corda.testing.node.NodeTestUtils.transaction;
@@ -110,7 +111,7 @@ public class TokenContractMoveTests {
                 tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 1L));
                 tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 1L));
                 tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), Long.MAX_VALUE));
-                tx.command(List.of(bob.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Move());
+                tx.command(Arrays.asList(bob.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Move());
                 tx.failsWith("The sum of quantities for each issuer should be conserved.");
                 return null;
             });
@@ -154,7 +155,7 @@ public class TokenContractMoveTests {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), carly.getParty(), 40L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), alice.getParty(), 20L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
-            tx.command(List.of(bob.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Move());
+            tx.command(Arrays.asList(bob.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Move());
             tx.verifies();
             return null;
         });

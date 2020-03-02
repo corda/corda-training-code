@@ -1,6 +1,5 @@
 package com.template.contracts;
 
-import com.sun.tools.javac.util.List;
 import com.template.states.TokenState;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.testing.contracts.DummyContract;
@@ -8,6 +7,8 @@ import net.corda.testing.contracts.DummyState;
 import net.corda.testing.core.TestIdentity;
 import net.corda.testing.node.MockServices;
 import org.junit.Test;
+
+import java.util.Arrays;
 
 import static com.template.contracts.TokenContract.TOKEN_CONTRACT_ID;
 import static net.corda.testing.node.NodeTestUtils.transaction;
@@ -22,9 +23,9 @@ public class TokenContractRedeemTests {
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.command(List.of(alice.getPublicKey(), bob.getPublicKey()), new DummyContract.Commands.Create());
+            tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new DummyContract.Commands.Create());
             tx.failsWith("Required com.template.contracts.TokenContract.Commands command");
-            tx.command(List.of(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
+            tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.verifies();
             return null;
         });
@@ -35,7 +36,7 @@ public class TokenContractRedeemTests {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.command(List.of(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
+            tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.failsWith("No tokens should be issued when redeeming.");
             return null;
         });
@@ -76,7 +77,7 @@ public class TokenContractRedeemTests {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
-            tx.command(List.of(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
+            tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.failsWith("The issuers should sign.");
             return null;
         });
@@ -87,7 +88,7 @@ public class TokenContractRedeemTests {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
-            tx.command(List.of(alice.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Redeem());
+            tx.command(Arrays.asList(alice.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.failsWith("The holders should sign.");
             return null;
         });
@@ -102,7 +103,7 @@ public class TokenContractRedeemTests {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
             tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), alice.getParty(), 20L));
             tx.command(
-                    List.of(alice.getPublicKey(), bob.getPublicKey(), carly.getPublicKey()),
+                    Arrays.asList(alice.getPublicKey(), bob.getPublicKey(), carly.getPublicKey()),
                     new TokenContract.Commands.Redeem());
             tx.verifies();
             return null;
