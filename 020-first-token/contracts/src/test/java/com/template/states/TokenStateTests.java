@@ -14,13 +14,13 @@ public class TokenStateTests {
     private final Party bob = new TestIdentity(new CordaX500Name("Bob", "London", "GB")).getParty();
     private final Party carly = new TestIdentity(new CordaX500Name("Carly", "London", "GB")).getParty();
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = NullPointerException.class)
     public void doesNotAcceptNullIssuer() {
         //noinspection ConstantConditions
         new TokenState(null, bob, 2L);
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = NullPointerException.class)
     public void doesNotAcceptNullOwner() {
         //noinspection ConstantConditions
         new TokenState(alice, null, 2L);
