@@ -65,12 +65,12 @@ class TokenContractRedeemTestsK {
     }
 
     @Test
-    fun `Holder must sign Redeem transaction`() {
+    fun `Current holder must sign Redeem transaction`() {
         ledgerServices.ledger {
             transaction {
                 input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
                 command(alice.publicKey, TokenContractK.Commands.Redeem())
-                `fails with`("The holders should sign.")
+                `fails with`("The current holders should sign.")
             }
         }
     }
@@ -88,13 +88,13 @@ class TokenContractRedeemTestsK {
     }
 
     @Test
-    fun `All holders must sign Redeem transaction`() {
+    fun `All current holders must sign Redeem transaction`() {
         ledgerServices.ledger {
             transaction {
                 input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
                 input(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 20L))
                 command(listOf(alice.publicKey, carly.publicKey), TokenContractK.Commands.Redeem())
-                `fails with`("The holders should sign.")
+                `fails with`("The current holders should sign.")
             }
         }
     }

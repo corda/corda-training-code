@@ -48,7 +48,7 @@ class TokenContractK : Contract {
                 "The sum of quantities for each issuer should be conserved." using inputSums.all { outputSums[it.key] == it.value }
 
                 // Constraints on the signers.
-                "The holders should sign." using command.signers.containsAll(inputs.map { it.holder.owningKey }.distinct())
+                "The current holders should sign." using command.signers.containsAll(inputs.map { it.holder.owningKey }.distinct())
             }
 
             is Commands.Redeem -> requireThat {
@@ -61,7 +61,7 @@ class TokenContractK : Contract {
 
                 // Constraints on the signers.
                 "The issuers should sign." using command.signers.containsAll(inputs.map { it.issuer.owningKey }.distinct())
-                "The holders should sign." using command.signers.containsAll(inputs.map { it.holder.owningKey }.distinct())
+                "The current holders should sign." using command.signers.containsAll(inputs.map { it.holder.owningKey }.distinct())
             }
 
             else -> throw IllegalArgumentException("Unknown command ${command.value}.")

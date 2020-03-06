@@ -134,20 +134,20 @@ class TokenContractMoveTestsK {
                 input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
                 output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 10L))
                 command(alice.publicKey, TokenContractK.Commands.Move())
-                `fails with`("The holders should sign.")
+                `fails with`("The current holders should sign.")
             }
         }
     }
 
     @Test
-    fun `All holders must sign Move transaction`() {
+    fun `All current holders must sign Move transaction`() {
         ledgerServices.ledger {
             transaction {
                 input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
                 input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 20L))
                 output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 30L))
                 command(bob.publicKey, TokenContractK.Commands.Move())
-                `fails with`("The holders should sign.")
+                `fails with`("The current holders should sign.")
             }
         }
     }

@@ -67,7 +67,7 @@ public class TokenContract implements Contract {
                                 .allMatch(entry -> outputSums.get(entry.getKey()).equals(entry.getValue())));
 
                 // Constraints on the signers.
-                req.using("The holders should sign.",
+                req.using("The current holders should sign.",
                         command.getSigners().containsAll(inputs.stream()
                                 .map(it -> it.getHolder().getOwningKey())
                                 .distinct()
@@ -92,7 +92,7 @@ public class TokenContract implements Contract {
                                 .distinct()
                                 .collect(Collectors.toList())
                         ));
-                req.using("The holders should sign.",
+                req.using("The current holders should sign.",
                         command.getSigners().containsAll(inputs.stream()
                                 .map(it -> it.getHolder().getOwningKey())
                                 .distinct()

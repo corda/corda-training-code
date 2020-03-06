@@ -63,11 +63,11 @@ public class TokenContractRedeemTests {
     }
 
     @Test
-    public void holderMustSignRedeemTransaction() {
+    public void currentHolderMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Redeem());
-            tx.failsWith("The holders should sign.");
+            tx.failsWith("The current holders should sign.");
             return null;
         });
     }
@@ -84,12 +84,12 @@ public class TokenContractRedeemTests {
     }
 
     @Test
-    public void allHoldersMustSignRedeemTransaction() {
+    public void allCurrentHoldersMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
             tx.command(Arrays.asList(alice.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Redeem());
-            tx.failsWith("The holders should sign.");
+            tx.failsWith("The current holders should sign.");
             return null;
         });
     }

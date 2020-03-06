@@ -127,19 +127,19 @@ public class TokenContractMoveTests {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 10L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Move());
-            tx.failsWith("The holders should sign.");
+            tx.failsWith("The current holders should sign.");
             return null;
         });
     }
 
     @Test
-    public void allHoldersMustSignMoveTransaction() {
+    public void allCurrentHoldersMustSignMoveTransaction() {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 20L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 30L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
-            tx.failsWith("The holders should sign.");
+            tx.failsWith("The current holders should sign.");
             return null;
         });
     }
