@@ -8,23 +8,23 @@ import java.util.stream.Collectors;
 
 public class TokenStateUtilities {
 
-    private static List<Long> getQuantityAsSingletonList(TokenState state) {
+    private static List<Long> getQuantityAsSingletonList(final TokenState state) {
         return Collections.singletonList(state.getQuantity());
     }
 
     private static <T> List<T> merge(final List<T> left, final List<T> right) {
-        List<T> merged = new ArrayList<>(left);
+        final List<T> merged = new ArrayList<>(left);
         merged.addAll(right);
         return merged;
     }
 
-    private static <K> Map.Entry<K, Long> mapSumValues(Map.Entry<K, List<Long>> entry) {
+    private static <K> Map.Entry<K, Long> mapSumValues(final Map.Entry<K, List<Long>> entry) {
         return new HashMap.SimpleEntry<>(
                 entry.getKey(),
                 sumExact(entry.getValue()));
     }
 
-    private static Long sumExact(List<Long> values) {
+    private static Long sumExact(final List<Long> values) {
         return values.stream().reduce(0L, Math::addExact);
     }
 
