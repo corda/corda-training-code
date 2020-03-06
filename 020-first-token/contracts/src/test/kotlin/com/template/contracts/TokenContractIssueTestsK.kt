@@ -21,6 +21,7 @@ class TokenContractIssueTestsK {
         ledgerServices.ledger {
             transaction {
                 output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                // Let's add a command from an unrelated dummy contract.
                 command(alice.publicKey, DummyContract.Commands.Create())
                 `fails with`("Required com.template.contracts.TokenContractK.Commands command")
                 command(alice.publicKey, TokenContractK.Commands.Issue())

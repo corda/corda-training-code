@@ -23,6 +23,7 @@ public class TokenContractIssueTests {
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            // Let's add a command from an unrelated dummy contract.
             tx.command(alice.getPublicKey(), new DummyContract.Commands.Create());
             tx.failsWith("Required com.template.contracts.TokenContract.Commands command");
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
