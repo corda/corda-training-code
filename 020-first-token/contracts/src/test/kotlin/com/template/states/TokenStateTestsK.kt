@@ -5,7 +5,6 @@ import net.corda.testing.core.TestIdentity
 import org.junit.Assert
 import org.junit.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 class TokenStateTestsK {
 
@@ -13,16 +12,16 @@ class TokenStateTestsK {
     private val bob = TestIdentity(CordaX500Name("Bob", "London", "GB")).party
     private val carly = TestIdentity(CordaX500Name("Carly", "London", "GB")).party
 
-    @Test(expected = IllegalArgumentException::class)
-    fun `it does not accept 0 amount`() {
-        TokenStateK(alice, bob, 0)
+    @Test
+    fun `it accepts a 0 amount`() {
+        val token = TokenStateK(alice, bob, 0)
+        assertEquals(0, token.quantity)
     }
 
     @Test
-    fun `it does not accept negative amount`() {
-        assertFailsWith(IllegalArgumentException::class) {
-            TokenStateK(alice, bob, -1)
-        }
+    fun `it accepts a negative amount`() {
+        val token = TokenStateK(alice, bob, -1)
+        assertEquals(-1, token.quantity)
     }
 
     // These tests are not necessary as this is the same as testing the `data class` construct.

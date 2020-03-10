@@ -53,6 +53,32 @@ public class TokenContractRedeemTests {
     }
 
     @Test
+    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
+    // let that happen.
+    public void inputsMustNotHaveAZeroQuantity() {
+        transaction(ledgerServices, tx -> {
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 0L));
+            tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
+            tx.failsWith("All quantities must be above 0.");
+            return null;
+        });
+    }
+
+    @Test
+    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
+    // let that happen.
+    public void inputsMustNotHaveNegativeQuantity() {
+        transaction(ledgerServices, tx -> {
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), -1L));
+            tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
+            tx.failsWith("All quantities must be above 0.");
+            return null;
+        });
+    }
+
+    @Test
     public void issuerMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));

@@ -54,6 +54,30 @@ class TokenContractIssueTestsK {
     }
 
     @Test
+    fun `Outputs must not have a zero quantity`() {
+        ledgerServices.ledger {
+            transaction {
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 0L))
+                command(alice.publicKey, TokenContractK.Commands.Issue())
+                `fails with`("All quantities must be above 0.")
+            }
+        }
+    }
+
+    @Test
+    fun `Outputs must not have negative quantity`() {
+        ledgerServices.ledger {
+            transaction {
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, -1L))
+                command(alice.publicKey, TokenContractK.Commands.Issue())
+                `fails with`("All quantities must be above 0.")
+            }
+        }
+    }
+
+    @Test
     fun `Issuer must sign Issue transaction`() {
         ledgerServices.ledger {
             transaction {

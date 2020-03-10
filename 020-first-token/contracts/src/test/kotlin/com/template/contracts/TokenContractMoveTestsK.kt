@@ -55,6 +55,62 @@ class TokenContractMoveTestsK {
     }
 
     @Test
+    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
+    // let that happen.
+    fun `Inputs must not have a zero quantity`() {
+        ledgerServices.ledger {
+            transaction {
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 0L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                command(bob.publicKey, TokenContractK.Commands.Move())
+                `fails with`("All quantities must be above 0.")
+            }
+        }
+    }
+
+    @Test
+    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
+    // let that happen.
+    fun `Inputs must not have negative quantity`() {
+        ledgerServices.ledger {
+            transaction {
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, -1L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 9L))
+                command(bob.publicKey, TokenContractK.Commands.Move())
+                `fails with`("All quantities must be above 0.")
+            }
+        }
+    }
+
+    @Test
+    fun `Outputs must not have a zero quantity`() {
+        ledgerServices.ledger {
+            transaction {
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 0L))
+                command(bob.publicKey, TokenContractK.Commands.Move())
+                `fails with`("All quantities must be above 0.")
+            }
+        }
+    }
+
+    @Test
+    fun `Outputs must not have negative quantity`() {
+        ledgerServices.ledger {
+            transaction {
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 11L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, -1L))
+                command(bob.publicKey, TokenContractK.Commands.Move())
+                `fails with`("All quantities must be above 0.")
+            }
+        }
+    }
+
+    @Test
     fun `Issuer must be conserved in Move transaction`() {
         ledgerServices.ledger {
             transaction {

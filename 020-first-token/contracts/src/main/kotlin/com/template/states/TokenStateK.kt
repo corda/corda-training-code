@@ -9,9 +9,5 @@ import net.corda.core.identity.Party
 @BelongsToContract(TokenContractK::class)
 data class TokenStateK(val issuer: Party, val holder: Party, val quantity: Long) : ContractState {
 
-    init {
-        require(quantity > 0) { "quantity must be above 0" }
-    }
-
     override val participants: List<AbstractParty> = listOf(holder)
 }

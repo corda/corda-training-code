@@ -54,6 +54,34 @@ class TokenContractRedeemTestsK {
     }
 
     @Test
+    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
+    // let that happen.
+    fun `Inputs must not have a zero quantity`() {
+        ledgerServices.ledger {
+            transaction {
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 0L))
+                command(listOf(alice.publicKey, bob.publicKey), TokenContractK.Commands.Redeem())
+                `fails with`("All quantities must be above 0.")
+            }
+        }
+    }
+
+    @Test
+    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
+    // let that happen.
+    fun `Inputs must not have negative quantity`() {
+        ledgerServices.ledger {
+            transaction {
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, -1L))
+                command(listOf(alice.publicKey, bob.publicKey), TokenContractK.Commands.Redeem())
+                `fails with`("All quantities must be above 0.")
+            }
+        }
+    }
+
+    @Test
     fun `Issuer must sign Redeem transaction`() {
         ledgerServices.ledger {
             transaction {

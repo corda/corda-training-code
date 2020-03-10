@@ -27,6 +27,9 @@ public class TokenContract implements Contract {
         // This will be useful, for instance, when the token is exchanged in a trade.
         final List<TokenState> inputs = tx.inputsOfType(TokenState.class);
         final List<TokenState> outputs = tx.outputsOfType(TokenState.class);
+        final boolean hasAllPositiveQuantities =
+                inputs.stream().allMatch(it -> 0 < it.getQuantity()) &&
+                        outputs.stream().allMatch(it -> 0 < it.getQuantity());
 
         if (command.getValue() instanceof Commands.Issue) {
             requireThat(req -> {
@@ -35,7 +38,7 @@ public class TokenContract implements Contract {
                 req.using("There should be issued tokens.", !outputs.isEmpty());
 
                 // Constraints on the issued tokens themselves.
-                // The "above 0" constraint is enforced at the constructor level.
+                req.using("All quantities must be above 0.", hasAllPositiveQuantities);
 
                 // Constraints on the signers.
                 req.using("The issuers should sign.",
@@ -55,7 +58,7 @@ public class TokenContract implements Contract {
                 req.using("There should be moved tokens.", !outputs.isEmpty());
 
                 // Constraints on the redeemed tokens themselves.
-                // The "above 0" constraint is enforced at the constructor level.
+                req.using("All quantities must be above 0.", hasAllPositiveQuantities);
                 final Map<Party, Long> inputSums = TokenStateUtilities.mapSumByIssuer(inputs);
                 final Map<Party, Long> outputSums = TokenStateUtilities.mapSumByIssuer(outputs);
                 req.using(
@@ -83,7 +86,7 @@ public class TokenContract implements Contract {
                 req.using("No tokens should be issued when redeeming.", outputs.isEmpty());
 
                 // Constraints on the redeemed tokens themselves.
-                // The "above 0" constraint is enforced at the constructor level.
+                req.using("All quantities must be above 0.", hasAllPositiveQuantities);
 
                 // Constraints on the signers.
                 req.using("The issuers should sign.",

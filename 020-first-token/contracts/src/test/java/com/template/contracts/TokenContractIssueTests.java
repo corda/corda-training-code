@@ -54,6 +54,28 @@ public class TokenContractIssueTests {
     }
 
     @Test
+    public void outputsMustNotHaveAZeroQuantity() {
+        transaction(ledgerServices, tx -> {
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 0L));
+            tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
+            tx.failsWith("All quantities must be above 0.");
+            return null;
+        });
+    }
+
+    @Test
+    public void outputsMustNotHaveANegativeQuantity() {
+        transaction(ledgerServices, tx -> {
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), -1L));
+            tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
+            tx.failsWith("All quantities must be above 0.");
+            return null;
+        });
+    }
+
+    @Test
     public void issuerMustSignIssueTransaction() {
         transaction(ledgerServices, tx -> {
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));

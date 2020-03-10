@@ -20,6 +20,7 @@ class TokenContractK : Contract {
         // This will be useful, for instance, when the token is exchanged in a trade.
         val inputs = tx.inputsOfType<TokenStateK>()
         val outputs = tx.outputsOfType<TokenStateK>()
+        val hasAllPositiveQuantities = inputs.all { 0 < it.quantity } && outputs.all { 0 < it.quantity }
 
         when (command.value) {
             is Commands.Issue -> requireThat {
@@ -28,7 +29,7 @@ class TokenContractK : Contract {
                 "There should be issued tokens." using outputs.isNotEmpty()
 
                 // Constraints on the issued tokens themselves.
-                // The "above 0" constraint is enforced at the constructor level.
+                "All quantities must be above 0." using hasAllPositiveQuantities
 
                 // Constraints on the signers.
                 "The issuers should sign." using command.signers.containsAll(outputs.map { it.issuer.owningKey }.distinct())
@@ -41,7 +42,7 @@ class TokenContractK : Contract {
                 "There should be moved tokens." using outputs.isNotEmpty()
 
                 // Constraints on the moved tokens themselves.
-                // The "above 0" constraint is enforced at the constructor level.
+                "All quantities must be above 0." using hasAllPositiveQuantities
                 val inputSums = inputs.mapSumByIssuer()
                 val outputSums = outputs.mapSumByIssuer()
                 "Consumed and created issuers should be identical." using (inputSums.keys == outputSums.keys)
@@ -57,7 +58,7 @@ class TokenContractK : Contract {
                 "No tokens should be issued when redeeming." using outputs.isEmpty()
 
                 // Constraints on the redeemed tokens themselves.
-                // The "above 0" constraint is enforced at the constructor level.
+                "All quantities must be above 0." using hasAllPositiveQuantities
 
                 // Constraints on the signers.
                 "The issuers should sign." using command.signers.containsAll(inputs.map { it.issuer.owningKey }.distinct())

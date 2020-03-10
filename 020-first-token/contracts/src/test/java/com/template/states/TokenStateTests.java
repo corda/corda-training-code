@@ -26,14 +26,16 @@ public class TokenStateTests {
         new TokenState(alice, null, 2L);
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void doesNotAccept0Amount() {
-        new TokenState(alice, bob, 0L);
+    @Test
+    public void accepts0Amount() {
+        final TokenState token = new TokenState(alice, bob, 0L);
+        assertEquals(0, token.getQuantity());
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void doesNotAcceptNegativeAmount() {
-        new TokenState(alice, bob, -1L);
+    @Test
+    public void acceptsNegativeAmount() {
+        final TokenState token = new TokenState(alice, bob, -1L);
+        assertEquals(-1, token.getQuantity());
     }
 
     @Test

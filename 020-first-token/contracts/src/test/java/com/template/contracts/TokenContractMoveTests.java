@@ -54,6 +54,58 @@ public class TokenContractMoveTests {
     }
 
     @Test
+    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
+    // let that happen.
+    public void inputsMustNotHaveAZeroQuantity() {
+        transaction(ledgerServices, tx -> {
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 0L));
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
+            tx.failsWith("All quantities must be above 0.");
+            return null;
+        });
+    }
+
+    @Test
+    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
+    // let that happen.
+    public void inputsMustNotHaveNegativeQuantity() {
+        transaction(ledgerServices, tx -> {
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), -1L));
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 9L));
+            tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
+            tx.failsWith("All quantities must be above 0.");
+            return null;
+        });
+    }
+
+    @Test
+    public void outputsMustNotHaveAZeroQuantity() {
+        transaction(ledgerServices, tx -> {
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 0L));
+            tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
+            tx.failsWith("All quantities must be above 0.");
+            return null;
+        });
+    }
+
+    @Test
+    public void outputsMustNotHaveNegativeQuantity() {
+        transaction(ledgerServices, tx -> {
+            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 11L));
+            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), -1L));
+            tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
+            tx.failsWith("All quantities must be above 0.");
+            return null;
+        });
+    }
+
+    @Test
     public void issuerMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));

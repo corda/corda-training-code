@@ -27,7 +27,6 @@ public final class TokenState implements ContractState {
         if (holder == null) throw new NullPointerException("holder cannot be null");
         this.issuer = issuer;
         this.holder = holder;
-        if (quantity <= 0) throw new IllegalArgumentException("quantity must be above 0");
         this.quantity = quantity;
     }
 
