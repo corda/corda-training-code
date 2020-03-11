@@ -50,6 +50,8 @@ public final class TokenState implements ContractState {
         return quantity;
     }
 
+    // equals, hashcode and toString are not strictly necessary, although they come in handy in our unit tests.
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) return true;

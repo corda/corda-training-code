@@ -1,4 +1,4 @@
-package com.template
+package com.template.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.template.contracts.TokenContractK
@@ -7,23 +7,28 @@ import com.template.states.TokenStateK
 import net.corda.core.contracts.Command
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
+import net.corda.core.node.StatesToRecord
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 
-object IssueFlowK {
+object IssueFlowsK {
 
     @InitiatingFlow
     @StartableByRPC
     /**
-     * Started by the issuer to issue multiple states where it is the only issuer.
+     * Started by the [TokenStateK.issuer] to issue multiple states where it is the only issuer.
      * Because it is an [InitiatingFlow], its counterpart flow [Responder] is called automatically.
+     * This constructor would typically be called by RPC or by [FlowLogic.subFlow].
      */
+
     class Initiator(private val heldQuantities: List<Pair<Party, Long>>) : FlowLogic<SignedTransaction>() {
 
-        constructor(heldQuantity: Pair<Party, Long>) : this(listOf(heldQuantity))
-        // Started by the issuer to issue a single state.
-        constructor(holder: Party, quantity: Long) : this(Pair(holder, quantity))
+        /**
+         * The only constructor that can be called from the CLI.
+         * Started by the issuer to issue a single state.
+         */
+        constructor(holder: Party, quantity: Long) : this(listOf(Pair(holder, quantity)))
 
         @Suppress("ClassName")
         companion object {
@@ -59,6 +64,8 @@ object IssueFlowK {
             outputTokens.forEach { txBuilder.addOutputState(it, TokenContractK.TOKEN_CONTRACT_ID) }
 
             progressTracker.currentStep = SIGNING_TRANSACTION
+            // We are the only issuer here, and the issuer's signature is required. So we sign.
+            // There are no other signatures to collect.
             val fullySignedTx = serviceHub.signInitialTransaction(txBuilder)
 
             progressTracker.currentStep = VERIFYING_TRANSACTION
@@ -67,11 +74,18 @@ object IssueFlowK {
             progressTracker.currentStep = FINALISING_TRANSACTION
             val holderFlows = outputTokens
                     .map { it.holder }
-                    // Duplicates would be an issue when initiating flows, at least.
+                    // Remove duplicates as it would be an issue when initiating flows, at least.
+                    // If we did not use a Stream we could for instance use a Set.
                     .distinct()
-                    // I do not need to inform myself separately.
+                    // Remove myself.
+                    // I already know what I am doing so no need to inform myself with a separate flow.
                     .minus(ourIdentity)
                     .map { initiateFlow(it) }
+
+            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
+            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
+            // manually.
+            serviceHub.recordTransactions(StatesToRecord.ALL_VISIBLE, listOf(fullySignedTx))
 
             return subFlow(FinalityFlow(
                     fullySignedTx,

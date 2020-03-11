@@ -1,12 +1,14 @@
 package com.template.flows;
 
 import co.paralleluniverse.fibers.Suspendable;
+import com.google.common.collect.ImmutableList;
 import com.template.contracts.TokenContract;
 import com.template.contracts.TokenContract.Commands.Issue;
 import com.template.states.TokenState;
 import net.corda.core.contracts.Command;
 import net.corda.core.flows.*;
 import net.corda.core.identity.Party;
+import net.corda.core.node.StatesToRecord;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.core.transactions.TransactionBuilder;
 import net.corda.core.utilities.ProgressTracker;
@@ -17,7 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public interface IssueFlow {
+public interface IssueFlows {
 
     class Pair<T, U> {
         public final T first;
@@ -29,11 +31,19 @@ public interface IssueFlow {
         }
     }
 
+    /**
+     * Started by the {@link TokenState#getIssuer} to issue multiple states where it is the only issuer.
+     * Because it is an {@link InitiatingFlow}, its counterpart flow {@link Responder} is called automatically.
+     */
     @InitiatingFlow
     @StartableByRPC
     class Initiator extends FlowLogic<SignedTransaction> {
 
+        @SuppressWarnings("DanglingJavadoc")
         @NotNull
+        /**
+         * It may contain a given {@link Party} more than once, so that we can issue multiple states to a given holder.
+         */
         private final List<Pair<Party, Long>> heldQuantities;
 
         private final Step GENERATING_TRANSACTION = new Step("Generating transaction based on new IOU.");
@@ -53,16 +63,19 @@ public interface IssueFlow {
                 FINALISING_TRANSACTION
         );
 
+        /**
+         * This constructor would typically be called by RPC or by {@link FlowLogic#subFlow}.
+         */
         public Initiator(@NotNull final List<Pair<Party, Long>> heldQuantities) {
             this.heldQuantities = heldQuantities;
         }
 
-        public Initiator(@NotNull final Pair<Party, Long> heldQuantity) {
-            this(Collections.singletonList(heldQuantity));
-        }
-
+        /**
+         * The only constructor that can be called from the CLI.
+         * Started by the issuer to issue a single state.
+         */
         public Initiator(@NotNull final Party holder, final long quantity) {
-            this(new Pair<>(holder, quantity));
+            this(Collections.singletonList(new Pair<>(holder, quantity)));
         }
 
         @Override
@@ -76,8 +89,12 @@ public interface IssueFlow {
 
             final Party issuer = getOurIdentity();
             final List<TokenState> outputTokens = heldQuantities
+                    // Thanks to the Stream, we are able to have our List final in one go, instead of creating a
+                    // modifiable one and then adding elements to it with for... add.
                     .stream()
+                    // Change each element from a Pair to a TokenState.
                     .map(it -> new TokenState(issuer, it.first, it.second))
+                    // Get away from a Stream and back to a good ol' List.
                     .collect(Collectors.toList());
             final Party notary = getServiceHub().getNetworkMapCache().getNotaryIdentities().get(0);
 
@@ -88,21 +105,34 @@ public interface IssueFlow {
             outputTokens.forEach(it -> txBuilder.addOutputState(it, TokenContract.TOKEN_CONTRACT_ID));
 
             progressTracker.setCurrentStep(SIGNING_TRANSACTION);
+            // We are the only issuer here, and the issuer's signature is required. So we sign.
+            // There are no other signatures to collect.
             final SignedTransaction fullySignedTx = getServiceHub().signInitialTransaction(txBuilder);
 
             progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
             txBuilder.verify(getServiceHub());
 
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
-            final List<FlowSession> holderFlows = outputTokens
-                    .stream()
+            // Thanks to the Stream, we are able to have our List final in one go, instead of creating a modifiable
+            // one and then conditionally adding elements to it with for... add.
+            final List<FlowSession> holderFlows = outputTokens.stream()
+                    // Extract the holder Party from the token
                     .map(TokenState::getHolder)
-                    // Duplicates would be an issue when initiating flows, at least.
+                    // Remove duplicates as it would be an issue when initiating flows, at least.
+                    // If we did not use a Stream we could for instance use a Set.
                     .distinct()
-                    // I do not need to inform myself separately.
+                    // Remove myself from the Stream.
+                    // I already know what I am doing so no need to inform myself with a separate flow.
                     .filter(it -> !it.equals(issuer))
+                    // Change each element of Stream from a Party to a FlowSession.
                     .map(this::initiateFlow)
+                    // Get away from a Stream and back to a good ol' List.
                     .collect(Collectors.toList());
+
+            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
+            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
+            // manually.
+            getServiceHub().recordTransactions(StatesToRecord.ALL_VISIBLE, ImmutableList.of(fullySignedTx));
 
             return subFlow(new FinalityFlow(
                     fullySignedTx,
@@ -115,7 +145,8 @@ public interface IssueFlow {
     @InitiatedBy(Initiator.class)
     class Responder extends FlowLogic<SignedTransaction> {
 
-        @NotNull private final FlowSession counterpartySession;
+        @NotNull
+        private final FlowSession counterpartySession;
 
         public Responder(@NotNull final FlowSession counterpartySession) {
             this.counterpartySession = counterpartySession;

@@ -1,6 +1,5 @@
-package com.template
+package com.template.flows
 
-import com.template.states.TokenStateK
 import net.corda.core.utilities.getOrThrow
 import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.MockNetwork
@@ -13,7 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class IssueFlowTestsK {
+class IssueFlowsTestsK {
     private val network = MockNetwork(MockNetworkParameters(listOf(
             TestCordapp.findCordapp("com.template.contracts"),
             TestCordapp.findCordapp("com.template.flows"))))
@@ -24,7 +23,7 @@ class IssueFlowTestsK {
 
     init {
         listOf(alice, bob, carly).forEach {
-            it.registerInitiatedFlow(IssueFlowK.Responder::class.java)
+            it.registerInitiatedFlow(IssueFlowsK.Responder::class.java)
         }
     }
 
@@ -36,7 +35,7 @@ class IssueFlowTestsK {
 
     @Test
     fun `SignedTransaction returned by the flow is signed by the issuer`() {
-        val flow = IssueFlowK.Initiator(bob.info.singleIdentity(), 10L)
+        val flow = IssueFlowsK.Initiator(bob.info.singleIdentity(), 10L)
         val future = alice.startFlow(flow)
         network.runNetwork()
 
@@ -46,7 +45,7 @@ class IssueFlowTestsK {
 
     @Test
     fun `flow records a transaction in issuer and holder transaction storages only`() {
-        val flow = IssueFlowK.Initiator(bob.info.singleIdentity(), 10L)
+        val flow = IssueFlowsK.Initiator(bob.info.singleIdentity(), 10L)
         val future = alice.startFlow(flow)
         network.runNetwork()
         val signedTx = future.getOrThrow()
@@ -62,7 +61,7 @@ class IssueFlowTestsK {
 
     @Test
     fun `flow records a transaction in issuer and both holder transaction storages`() {
-        val flow = IssueFlowK.Initiator(listOf(
+        val flow = IssueFlowsK.Initiator(listOf(
                 Pair(bob.info.singleIdentity(), 10L),
                 Pair(carly.info.singleIdentity(), 20L)))
         val future = alice.startFlow(flow)
@@ -78,7 +77,9 @@ class IssueFlowTestsK {
 
     @Test
     fun `recorded transaction has no inputs and a single output, the token state`() {
-        val flow = IssueFlowK.Initiator(bob.info.singleIdentity(), 10L)
+        val expected = createFrom(alice, bob, 10L)
+
+        val flow = IssueFlowsK.Initiator(expected.holder, expected.quantity)
         val future = alice.startFlow(flow)
         network.runNetwork()
         val signedTx = future.getOrThrow()
@@ -89,19 +90,31 @@ class IssueFlowTestsK {
             assertTrue(recordedTx.tx.inputs.isEmpty())
             val txOutputs = recordedTx.tx.outputs
             assertEquals(1, txOutputs.size)
-
-            val recordedState = txOutputs[0].data as TokenStateK
-            assertEquals(alice.info.singleIdentity(), recordedState.issuer)
-            assertEquals(bob.info.singleIdentity(), recordedState.holder)
-            assertEquals(10L, recordedState.quantity)
+            assertEquals(expected, txOutputs[0].data)
         }
     }
 
     @Test
+    fun `there is 1 correct recorded state`() {
+        val expected = createFrom(alice, bob, 10L)
+
+        val flow = IssueFlowsK.Initiator(expected.holder, expected.quantity)
+        val future = alice.startFlow(flow)
+        network.runNetwork()
+        future.get()
+
+        // We check the recorded state in both vaults.
+        alice.assertHasStatesInVault(listOf(expected))
+        bob.assertHasStatesInVault(listOf(expected))
+    }
+
+    @Test
     fun `recorded transaction has no inputs and many outputs, the token states`() {
-        val flow = IssueFlowK.Initiator(listOf(
-                Pair(bob.info.singleIdentity(), 10L),
-                Pair(carly.info.singleIdentity(), 20L)))
+        val expected1 = createFrom(alice, bob, 10L)
+        val expected2 = createFrom(alice, carly, 20L)
+        val flow = IssueFlowsK.Initiator(listOf(
+                expected1.toPair(),
+                expected2.toPair()))
         val future = alice.startFlow(flow)
         network.runNetwork()
         val signedTx = future.getOrThrow()
@@ -112,24 +125,39 @@ class IssueFlowTestsK {
             assertTrue(recordedTx.tx.inputs.isEmpty())
             val txOutputs = recordedTx.tx.outputs
             assertEquals(2, txOutputs.size)
-
-            val recordedState1 = txOutputs[0].data as TokenStateK
-            assertEquals(alice.info.singleIdentity(), recordedState1.issuer)
-            assertEquals(bob.info.singleIdentity(), recordedState1.holder)
-            assertEquals(10L, recordedState1.quantity)
-
-            val recordedState2 = txOutputs[1].data as TokenStateK
-            assertEquals(alice.info.singleIdentity(), recordedState2.issuer)
-            assertEquals(carly.info.singleIdentity(), recordedState2.holder)
-            assertEquals(20L, recordedState2.quantity)
+            assertEquals(expected1, txOutputs[0].data)
+            assertEquals(expected2, txOutputs[1].data)
         }
     }
 
     @Test
+    fun `there are 2 correct recorded states by relevance`() {
+        val expected1 = createFrom(alice, bob, 10L)
+        val expected2 = createFrom(alice, carly, 20L)
+
+        val flow = IssueFlowsK.Initiator(listOf(
+                expected1.toPair(),
+                expected2.toPair()))
+        val future = alice.startFlow(flow)
+        network.runNetwork()
+        future.get()
+
+        // We check the recorded state in the 4 vaults.
+        alice.assertHasStatesInVault(listOf(expected1, expected2))
+        // Notice how bob did not save carly's state.
+        bob.assertHasStatesInVault(listOf(expected1))
+        carly.assertHasStatesInVault(listOf(expected2))
+        dan.assertHasStatesInVault(listOf())
+    }
+
+    @Test
     fun `recorded transaction has no inputs and 2 outputs of same holder, the token states`() {
-        val flow = IssueFlowK.Initiator(listOf(
-                Pair(bob.info.singleIdentity(), 10L),
-                Pair(bob.info.singleIdentity(), 20L)))
+        val expected1 = createFrom(alice, bob, 10L)
+        val expected2 = createFrom(alice, bob, 20L)
+
+        val flow = IssueFlowsK.Initiator(listOf(
+                expected1.toPair(),
+                expected2.toPair()))
         val future = alice.startFlow(flow)
         network.runNetwork()
         val signedTx = future.getOrThrow()
@@ -140,17 +168,29 @@ class IssueFlowTestsK {
             assertTrue(recordedTx.tx.inputs.isEmpty())
             val txOutputs = recordedTx.tx.outputs
             assertEquals(2, txOutputs.size)
-
-            val recordedState1 = txOutputs[0].data as TokenStateK
-            assertEquals(alice.info.singleIdentity(), recordedState1.issuer)
-            assertEquals(bob.info.singleIdentity(), recordedState1.holder)
-            assertEquals(10L, recordedState1.quantity)
-
-            val recordedState2 = txOutputs[1].data as TokenStateK
-            assertEquals(alice.info.singleIdentity(), recordedState2.issuer)
-            assertEquals(bob.info.singleIdentity(), recordedState2.holder)
-            assertEquals(20L, recordedState2.quantity)
+            assertEquals(expected1, txOutputs[0].data)
+            assertEquals(expected2, txOutputs[1].data)
         }
+    }
+
+
+    @Test
+    fun `there are 2 correct recorded states again`() {
+        val expected1 = createFrom(alice, bob, 10L)
+        val expected2 = createFrom(alice, bob, 20L)
+
+        val flow = IssueFlowsK.Initiator(listOf(
+                expected1.toPair(),
+                expected2.toPair()))
+        val future = alice.startFlow(flow)
+        network.runNetwork()
+        future.get()
+
+        // We check the recorded state in the 4 vaults.
+        alice.assertHasStatesInVault(listOf(expected1, expected2))
+        bob.assertHasStatesInVault(listOf(expected1, expected2))
+        carly.assertHasStatesInVault(listOf())
+        dan.assertHasStatesInVault(listOf())
     }
 
 }
