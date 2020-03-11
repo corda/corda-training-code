@@ -1,13 +1,12 @@
 package com.template.states;
 
+import com.google.common.collect.ImmutableMap;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.testing.core.TestIdentity;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 
 import static com.template.states.TokenStateUtilities.mapSumByIssuer;
 import static org.junit.Assert.assertEquals;
@@ -59,6 +58,36 @@ public class TokenStateUtilitiesMapSumByIssuerTests {
         final Map<Party, Long> mappedSums = mapSumByIssuer(Collections.singletonList(new TokenState(alice, bob, 10)));
         //noinspection ConstantConditions
         mappedSums.put(alice, 20L);
+    }
+
+    /**
+     * This function is given to help understand the Stream way of doing in {@link TokenStateUtilities#mapSumByIssuer}.
+     */
+    private Map<Party, Long> standardMapSumByIssuer(final Collection<TokenState> states) {
+        final HashMap<Party, Long> working = new HashMap<>();
+        for (TokenState state : states) {
+            working.merge(state.getHolder(), state.getQuantity(), Math::addExact);
+        }
+        return ImmutableMap.copyOf(working);
+    }
+
+    @Test
+    public void compareWithStandard() {
+        final Map<Party, Long> mappedSums1 = standardMapSumByIssuer(Arrays.asList(
+                new TokenState(alice, bob, 10),
+                new TokenState(alice, carly, 15),
+                new TokenState(carly, bob, 30),
+                new TokenState(carly, carly, 25),
+                new TokenState(carly, alice, 2)));
+        final Map<Party, Long> mappedSums2 = standardMapSumByIssuer(Arrays.asList(
+                new TokenState(alice, bob, 10),
+                new TokenState(alice, carly, 15),
+                new TokenState(carly, bob, 30),
+                new TokenState(carly, carly, 25),
+                new TokenState(carly, alice, 2)));
+        assertEquals(mappedSums1.size(), mappedSums2.size());
+        assertEquals(mappedSums1.get(alice).longValue(), mappedSums2.get(alice).longValue());
+        assertEquals(mappedSums1.get(carly).longValue(), mappedSums2.get(carly).longValue());
     }
 
 }
