@@ -1,8 +1,10 @@
 package com.template.flows
 
+import com.google.common.collect.ImmutableList
 import net.corda.core.utilities.getOrThrow
 import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.MockNetwork
+import net.corda.testing.node.MockNetworkNotarySpec
 import net.corda.testing.node.MockNetworkParameters
 import net.corda.testing.node.TestCordapp
 import org.junit.After
@@ -13,9 +15,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IssueFlowsTestsK {
-    private val network = MockNetwork(MockNetworkParameters(listOf(
-            TestCordapp.findCordapp("com.template.contracts"),
-            TestCordapp.findCordapp("com.template.flows"))))
+    private val network = MockNetwork(MockNetworkParameters(
+            notarySpecs = ImmutableList.of(MockNetworkNotarySpec(Constants.desiredNotary)),
+            cordappsForAllNodes = listOf(
+                    TestCordapp.findCordapp("com.template.contracts"),
+                    TestCordapp.findCordapp("com.template.flows"))))
     private val alice = network.createNode()
     private val bob = network.createNode()
     private val carly = network.createNode()

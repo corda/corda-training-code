@@ -55,7 +55,9 @@ object IssueFlowsK {
             val outputTokens = heldQuantities.map {
                 TokenStateK(issuer = issuer, holder = it.first, quantity = it.second)
             }
-            val notary = serviceHub.networkMapCache.notaryIdentities.first()
+            // It is better practice to precisely define the accepted notary instead of picking the first one in the
+            // list of notaries
+            val notary = serviceHub.networkMapCache.getNotary(Constants.desiredNotary)!!
 
             progressTracker.currentStep = GENERATING_TRANSACTION
             val txCommand = Command(Issue(), ourIdentity.owningKey)

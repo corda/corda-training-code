@@ -96,7 +96,9 @@ public interface IssueFlows {
                     .map(it -> new TokenState(issuer, it.first, it.second))
                     // Get away from a Stream and back to a good ol' List.
                     .collect(Collectors.toList());
-            final Party notary = getServiceHub().getNetworkMapCache().getNotaryIdentities().get(0);
+            // It is better practice to precisely define the accepted notary instead of picking the first one in the
+            // list of notaries
+            final Party notary = getServiceHub().getNetworkMapCache().getNotary(Constants.desiredNotary);
 
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
             final Command<Issue> txCommand = new Command<>(new Issue(), issuer.getOwningKey());
