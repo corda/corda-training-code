@@ -44,8 +44,7 @@ public class TokenContract implements Contract {
                 req.using("The issuers should sign.",
                         command.getSigners().containsAll(outputs.stream()
                                 .map(it -> it.getIssuer().getOwningKey())
-                                .distinct()
-                                .collect(Collectors.toList())
+                                .collect(Collectors.toSet())
                         ));
                 // We assume the owners need not sign although they are participants.
 
@@ -73,8 +72,7 @@ public class TokenContract implements Contract {
                 req.using("The current holders should sign.",
                         command.getSigners().containsAll(inputs.stream()
                                 .map(it -> it.getHolder().getOwningKey())
-                                .distinct()
-                                .collect(Collectors.toList())
+                                .collect(Collectors.toSet())
                         ));
 
                 return null;
@@ -92,14 +90,12 @@ public class TokenContract implements Contract {
                 req.using("The issuers should sign.",
                         command.getSigners().containsAll(inputs.stream()
                                 .map(it -> it.getIssuer().getOwningKey())
-                                .distinct()
-                                .collect(Collectors.toList())
+                                .collect(Collectors.toSet())
                         ));
                 req.using("The current holders should sign.",
                         command.getSigners().containsAll(inputs.stream()
                                 .map(it -> it.getHolder().getOwningKey())
-                                .distinct()
-                                .collect(Collectors.toList())
+                                .collect(Collectors.toSet())
                         ));
 
                 return null;
