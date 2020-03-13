@@ -15,19 +15,15 @@ import java.util.Collections;
 import java.util.List;
 
 import static com.template.flows.FlowHelpers.*;
-import static net.corda.testing.common.internal.ParametersUtilitiesKt.testNetworkParameters;
 import static org.junit.Assert.*;
 
 public class IssueFlowsTests {
-    private final MockNetwork network = new MockNetwork(new MockNetworkParameters(
-            false, false,
-            new InMemoryMessagingNetwork.ServicePeerAllocationStrategy.Random(),
-            ImmutableList.of(new MockNetworkNotarySpec(Constants.desiredNotary)),
-            testNetworkParameters(),
-            ImmutableList.of(
+    private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
+            .withNotarySpecs(ImmutableList.of(new MockNetworkNotarySpec(Constants.desiredNotary)))
+            .withCordappsForAllNodes(ImmutableList.of(
                     TestCordapp.findCordapp("com.template.contracts"),
                     TestCordapp.findCordapp("com.template.flows"))
-    ));
+            ));
     private final StartedMockNode alice = network.createNode();
     private final StartedMockNode bob = network.createNode();
     private final StartedMockNode carly = network.createNode();

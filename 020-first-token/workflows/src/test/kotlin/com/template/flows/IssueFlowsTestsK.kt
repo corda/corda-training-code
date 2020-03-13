@@ -15,9 +15,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IssueFlowsTestsK {
-    private val network = MockNetwork(MockNetworkParameters(
-            notarySpecs = ImmutableList.of(MockNetworkNotarySpec(Constants.desiredNotary)),
-            cordappsForAllNodes = listOf(
+    private val network = MockNetwork(MockNetworkParameters()
+            .withNotarySpecs(ImmutableList.of(MockNetworkNotarySpec(Constants.desiredNotary)))
+            .withCordappsForAllNodes(listOf(
                     TestCordapp.findCordapp("com.template.contracts"),
                     TestCordapp.findCordapp("com.template.flows"))))
     private val alice = network.createNode()
