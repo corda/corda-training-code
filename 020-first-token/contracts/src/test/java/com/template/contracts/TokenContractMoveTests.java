@@ -1,6 +1,5 @@
 package com.template.contracts;
 
-import com.template.states.TokenState;
 import kotlin.NotImplementedError;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.testing.contracts.DummyContract;
@@ -10,6 +9,7 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
+import static com.template.contracts.TestHelpers.createToken;
 import static com.template.contracts.TokenContract.TOKEN_CONTRACT_ID;
 import static net.corda.testing.node.NodeTestUtils.transaction;
 import static org.junit.Assert.assertEquals;
@@ -23,8 +23,8 @@ public class TokenContractMoveTests {
     @Test
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(alice.getPublicKey(), new DummyContract.Commands.Create());
             tx.failsWith("Required com.template.contracts.TokenContract.Commands command");
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
@@ -36,7 +36,7 @@ public class TokenContractMoveTests {
     @Test
     public void moveTransactionMustHaveInputs() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, 10L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("There should be tokens to move.");
             return null;
@@ -46,7 +46,7 @@ public class TokenContractMoveTests {
     @Test
     public void moveTransactionMustHaveOutputs() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("There should be moved tokens.");
             return null;
@@ -58,9 +58,9 @@ public class TokenContractMoveTests {
     // let that happen.
     public void inputsMustNotHaveAZeroQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 0L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 0L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("All quantities must be above 0.");
             return null;
@@ -72,9 +72,9 @@ public class TokenContractMoveTests {
     // let that happen.
     public void inputsMustNotHaveNegativeQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), -1L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 9L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, -1L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 9L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("All quantities must be above 0.");
             return null;
@@ -84,9 +84,9 @@ public class TokenContractMoveTests {
     @Test
     public void outputsMustNotHaveAZeroQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 0L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, 0L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("All quantities must be above 0.");
             return null;
@@ -96,9 +96,9 @@ public class TokenContractMoveTests {
     @Test
     public void outputsMustNotHaveNegativeQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 11L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), -1L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 11L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, -1L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("All quantities must be above 0.");
             return null;
@@ -108,8 +108,8 @@ public class TokenContractMoveTests {
     @Test
     public void issuerMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(carly, bob, 10L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("Consumed and created issuers should be identical.");
             return null;
@@ -119,9 +119,9 @@ public class TokenContractMoveTests {
     @Test
     public void allIssuersMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(carly, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 20L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("Consumed and created issuers should be identical.");
             return null;
@@ -131,9 +131,9 @@ public class TokenContractMoveTests {
     @Test
     public void sumMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 15L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 15L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 20L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("The sum of quantities for each issuer should be conserved.");
             return null;
@@ -143,12 +143,12 @@ public class TokenContractMoveTests {
     @Test
     public void allSumsPerIssuerMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 15L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 20L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 15L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 30L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 15L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(carly, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(carly, bob, 15L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(carly, bob, 30L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("The sum of quantities for each issuer should be conserved.");
             return null;
@@ -159,10 +159,10 @@ public class TokenContractMoveTests {
     public void sumsThatResultInOverflowAreNotPossibleInMoveTransaction() {
         try {
             transaction(ledgerServices, tx -> {
-                tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), Long.MAX_VALUE));
-                tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 1L));
-                tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 1L));
-                tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), Long.MAX_VALUE));
+                tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, Long.MAX_VALUE));
+                tx.input(TOKEN_CONTRACT_ID, createToken(alice, carly, 1L));
+                tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 1L));
+                tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, Long.MAX_VALUE));
                 tx.command(Arrays.asList(bob.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Move());
                 tx.failsWith("The sum of quantities for each issuer should be conserved.");
                 return null;
@@ -176,8 +176,8 @@ public class TokenContractMoveTests {
     @Test
     public void currentHolderMustSignMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, 10L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("The current holders should sign.");
             return null;
@@ -187,9 +187,9 @@ public class TokenContractMoveTests {
     @Test
     public void allCurrentHoldersMustSignMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 20L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 30L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, carly, 20L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, 30L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Move());
             tx.failsWith("The current holders should sign.");
             return null;
@@ -199,14 +199,14 @@ public class TokenContractMoveTests {
     @Test
     public void canHaveDifferentIssuersInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 20L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), alice.getParty(), 5L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 5L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 20L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), carly.getParty(), 40L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), alice.getParty(), 20L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 20L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, alice, 5L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 5L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(carly, carly, 40L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(carly, alice, 20L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(carly, bob, 20L));
             tx.command(Arrays.asList(bob.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Move());
             tx.verifies();
             return null;

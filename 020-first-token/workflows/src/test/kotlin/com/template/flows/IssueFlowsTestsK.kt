@@ -177,7 +177,6 @@ class IssueFlowsTestsK {
         }
     }
 
-
     @Test
     fun `there are 2 correct recorded states again`() {
         val expected1 = createFrom(alice, bob, 10L)

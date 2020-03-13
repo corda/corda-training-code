@@ -1,6 +1,5 @@
 package com.template.contracts;
 
-import com.template.states.TokenState;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.testing.contracts.DummyContract;
 import net.corda.testing.contracts.DummyState;
@@ -10,6 +9,7 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
+import static com.template.contracts.TestHelpers.createToken;
 import static com.template.contracts.TokenContract.TOKEN_CONTRACT_ID;
 import static net.corda.testing.node.NodeTestUtils.transaction;
 
@@ -22,7 +22,7 @@ public class TokenContractIssueTests {
     @Test
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             // Let's add a command from an unrelated dummy contract.
             tx.command(alice.getPublicKey(), new DummyContract.Commands.Create());
             tx.failsWith("Required com.template.contracts.TokenContract.Commands command");
@@ -35,8 +35,8 @@ public class TokenContractIssueTests {
     @Test
     public void issueTransactionMustHaveNoInputs() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
             tx.failsWith("No tokens should be consumed when issuing.");
             return null;
@@ -56,8 +56,8 @@ public class TokenContractIssueTests {
     @Test
     public void outputsMustNotHaveAZeroQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), 0L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, 0L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
             tx.failsWith("All quantities must be above 0.");
             return null;
@@ -67,8 +67,8 @@ public class TokenContractIssueTests {
     @Test
     public void outputsMustNotHaveANegativeQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), carly.getParty(), -1L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, carly, -1L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
             tx.failsWith("All quantities must be above 0.");
             return null;
@@ -78,7 +78,7 @@ public class TokenContractIssueTests {
     @Test
     public void issuerMustSignIssueTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Issue());
             tx.failsWith("The issuers should sign.");
             return null;
@@ -88,8 +88,8 @@ public class TokenContractIssueTests {
     @Test
     public void allIssuersMustSignIssueTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(carly, bob, 20L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Issue());
             tx.failsWith("The issuers should sign.");
             return null;
@@ -99,11 +99,11 @@ public class TokenContractIssueTests {
     @Test
     public void canHaveDifferentIssuersInIssueTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), alice.getParty(), 20L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 30L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), alice.getParty(), 20L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, alice, 20L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 30L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(carly, bob, 20L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(carly, alice, 20L));
             tx.command(Arrays.asList(alice.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Issue());
             tx.verifies();
             return null;

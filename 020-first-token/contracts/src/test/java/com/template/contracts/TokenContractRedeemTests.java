@@ -1,6 +1,5 @@
 package com.template.contracts;
 
-import com.template.states.TokenState;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.testing.contracts.DummyContract;
 import net.corda.testing.contracts.DummyState;
@@ -10,6 +9,7 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
+import static com.template.contracts.TestHelpers.createToken;
 import static com.template.contracts.TokenContract.TOKEN_CONTRACT_ID;
 import static net.corda.testing.node.NodeTestUtils.transaction;
 
@@ -22,7 +22,7 @@ public class TokenContractRedeemTests {
     @Test
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new DummyContract.Commands.Create());
             tx.failsWith("Required com.template.contracts.TokenContract.Commands command");
             tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
@@ -34,8 +34,8 @@ public class TokenContractRedeemTests {
     @Test
     public void redeemTransactionMustHaveNoOutputs() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.output(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.failsWith("No tokens should be issued when redeeming.");
             return null;
@@ -57,8 +57,8 @@ public class TokenContractRedeemTests {
     // let that happen.
     public void inputsMustNotHaveAZeroQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 0L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 0L));
             tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.failsWith("All quantities must be above 0.");
             return null;
@@ -70,8 +70,8 @@ public class TokenContractRedeemTests {
     // let that happen.
     public void inputsMustNotHaveNegativeQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), -1L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, -1L));
             tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.failsWith("All quantities must be above 0.");
             return null;
@@ -81,7 +81,7 @@ public class TokenContractRedeemTests {
     @Test
     public void issuerMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(bob.getPublicKey(), new TokenContract.Commands.Redeem());
             tx.failsWith("The issuers should sign.");
             return null;
@@ -91,7 +91,7 @@ public class TokenContractRedeemTests {
     @Test
     public void currentHolderMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
             tx.command(alice.getPublicKey(), new TokenContract.Commands.Redeem());
             tx.failsWith("The current holders should sign.");
             return null;
@@ -101,8 +101,8 @@ public class TokenContractRedeemTests {
     @Test
     public void allIssuersMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(carly, bob, 20L));
             tx.command(Arrays.asList(alice.getPublicKey(), bob.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.failsWith("The issuers should sign.");
             return null;
@@ -112,8 +112,8 @@ public class TokenContractRedeemTests {
     @Test
     public void allCurrentHoldersMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(carly, bob, 20L));
             tx.command(Arrays.asList(alice.getPublicKey(), carly.getPublicKey()), new TokenContract.Commands.Redeem());
             tx.failsWith("The current holders should sign.");
             return null;
@@ -123,11 +123,11 @@ public class TokenContractRedeemTests {
     @Test
     public void canHaveDifferentIssuersInRedeemTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), alice.getParty(), 20L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice.getParty(), bob.getParty(), 30L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), bob.getParty(), 20L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly.getParty(), alice.getParty(), 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 10L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, alice, 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(alice, bob, 30L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(carly, bob, 20L));
+            tx.input(TOKEN_CONTRACT_ID, createToken(carly, alice, 20L));
             tx.command(
                     Arrays.asList(alice.getPublicKey(), bob.getPublicKey(), carly.getPublicKey()),
                     new TokenContract.Commands.Redeem());
