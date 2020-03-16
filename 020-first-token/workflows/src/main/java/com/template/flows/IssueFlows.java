@@ -77,10 +77,10 @@ public interface IssueFlows {
         @Suspendable
         @Override
         public SignedTransaction call() throws FlowException {
-
+            // It is a design decision to have this flow initiated by the issuer.
             final Party issuer = getOurIdentity();
             final List<TokenState> outputTokens = heldQuantities
-                    // Thanks to the Stream, we are able to have our List final in one go, instead of creating a
+                    // Thanks to the Stream, we are able to have our 'final List' in one go, instead of creating a
                     // modifiable one and then adding elements to it with for... add.
                     .stream()
                     // Change each element from a Pair to a TokenState.
@@ -90,8 +90,12 @@ public interface IssueFlows {
             // It is better practice to precisely define the accepted notary instead of picking the first one in the
             // list of notaries
             final Party notary = getServiceHub().getNetworkMapCache().getNotary(Constants.desiredNotary);
+            if (notary == null) {
+                throw new FlowException("The desired notary is not known: " + Constants.desiredNotary.toString());
+            }
 
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
+            // The issuer is a required signer, so we express this here
             final Command<Issue> txCommand = new Command<>(new Issue(), issuer.getOwningKey());
             final TransactionBuilder txBuilder = new TransactionBuilder(notary)
                     .addCommand(txCommand);
@@ -106,7 +110,7 @@ public interface IssueFlows {
             txBuilder.verify(getServiceHub());
 
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
-            // Thanks to the Stream, we are able to have our List final in one go, instead of creating a modifiable
+            // Thanks to the Stream, we are able to have our 'final List' in one go, instead of creating a modifiable
             // one and then conditionally adding elements to it with for... add.
             final List<FlowSession> holderFlows = outputTokens.stream()
                     // Extract the holder Party from the token

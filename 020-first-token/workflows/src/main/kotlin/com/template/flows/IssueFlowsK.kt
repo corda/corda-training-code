@@ -51,6 +51,7 @@ object IssueFlowsK {
 
         @Suspendable
         override fun call(): SignedTransaction {
+            // It is a design decision to have this flow initiated by the issuer.
             val issuer = ourIdentity
             val outputTokens = heldQuantities.map {
                 TokenStateK(issuer = issuer, holder = it.first, quantity = it.second)
@@ -60,7 +61,8 @@ object IssueFlowsK {
             val notary = serviceHub.networkMapCache.getNotary(Constants.desiredNotary)!!
 
             progressTracker.currentStep = GENERATING_TRANSACTION
-            val txCommand = Command(Issue(), ourIdentity.owningKey)
+            // The issuer is a required signer, so we express this here
+            val txCommand = Command(Issue(), issuer.owningKey)
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
             outputTokens.forEach { txBuilder.addOutputState(it, TokenContractK.TOKEN_CONTRACT_ID) }
@@ -81,7 +83,7 @@ object IssueFlowsK {
                     .distinct()
                     // Remove myself.
                     // I already know what I am doing so no need to inform myself with a separate flow.
-                    .minus(ourIdentity)
+                    .minus(issuer)
                     .map { initiateFlow(it) }
 
             // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
