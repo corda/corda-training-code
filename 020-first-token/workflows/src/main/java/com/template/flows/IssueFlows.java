@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableList;
 import com.template.contracts.TokenContract;
 import com.template.contracts.TokenContract.Commands.Issue;
 import com.template.states.TokenState;
+import javafx.util.Pair;
 import net.corda.core.contracts.Command;
 import net.corda.core.flows.*;
 import net.corda.core.identity.Party;
@@ -20,16 +21,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public interface IssueFlows {
-
-    class Pair<T, U> {
-        public final T first;
-        public final U second;
-
-        public Pair(T first, U second) {
-            this.first = first;
-            this.second = second;
-        }
-    }
 
     /**
      * Started by the {@link TokenState#getIssuer} to issue multiple states where it is the only issuer.
@@ -93,7 +84,7 @@ public interface IssueFlows {
                     // modifiable one and then adding elements to it with for... add.
                     .stream()
                     // Change each element from a Pair to a TokenState.
-                    .map(it -> new TokenState(issuer, it.first, it.second))
+                    .map(it -> new TokenState(issuer, it.getKey(), it.getValue()))
                     // Get away from a Stream and back to a good ol' List.
                     .collect(Collectors.toList());
             // It is better practice to precisely define the accepted notary instead of picking the first one in the

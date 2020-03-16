@@ -2,6 +2,7 @@ package com.template.flows;
 
 import com.google.common.collect.ImmutableList;
 import com.template.states.TokenState;
+import javafx.util.Pair;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.ContractState;
 import net.corda.core.contracts.TransactionState;
@@ -75,8 +76,8 @@ public class IssueFlowsTests {
     @Test
     public void flowRecordsATransactionInIssuerAndBothHolderTransactionStorages() throws Exception {
         final IssueFlows.Initiator flow = new IssueFlows.Initiator(ImmutableList.of(
-                new IssueFlows.Pair<>(bob.getInfo().getLegalIdentities().get(0), 10L),
-                new IssueFlows.Pair<>(carly.getInfo().getLegalIdentities().get(0), 20L)));
+                new Pair<>(bob.getInfo().getLegalIdentities().get(0), 10L),
+                new Pair<>(carly.getInfo().getLegalIdentities().get(0), 20L)));
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
         final SignedTransaction signedTx = future.get();

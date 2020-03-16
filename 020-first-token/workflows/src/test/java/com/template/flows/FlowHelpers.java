@@ -1,6 +1,7 @@
 package com.template.flows;
 
 import com.template.states.TokenState;
+import javafx.util.Pair;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.identity.Party;
 import net.corda.testing.node.StartedMockNode;
@@ -24,8 +25,8 @@ class FlowHelpers {
     }
 
     static @NotNull
-    IssueFlows.Pair<Party, Long> toPair(@NotNull final TokenState token) {
-        return new IssueFlows.Pair<>(token.getHolder(), token.getQuantity());
+    Pair<Party, Long> toPair(@NotNull final TokenState token) {
+        return new Pair<>(token.getHolder(), token.getQuantity());
     }
 
     static void assertHasStatesInVault(
