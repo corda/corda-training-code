@@ -79,7 +79,6 @@ object IssueFlowsK {
             val holderFlows = outputTokens
                     .map { it.holder }
                     // Remove duplicates as it would be an issue when initiating flows, at least.
-                    // If we did not use a Stream we could for instance use a Set.
                     .distinct()
                     // Remove myself.
                     // I already know what I am doing so no need to inform myself with a separate flow.
