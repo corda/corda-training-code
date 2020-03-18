@@ -17,10 +17,10 @@ import net.corda.core.utilities.unwrap
 object MoveFlowsK {
 
     @CordaSerializable
-    interface ResponderType {
-        class Signer : ResponderType
-        class Holder : ResponderType
-    }
+    /**
+     * A participant needs to sign, an observer only needs to receive the result.
+     */
+    enum class TransactionRole { PARTICIPANT, OBSERVER }
 
     @InitiatingFlow
     @StartableByRPC
@@ -94,7 +94,7 @@ object MoveFlowsK {
             val signerFlows = signers
                     .map { initiateFlow(it) }
                     // Prime these responders to act in a signer type of way.
-                    .onEach { it.send(ResponderType.Signer()) }
+                    .onEach { it.send(TransactionRole.PARTICIPANT) }
             val fullySignedTx =
                     if (signerFlows.isEmpty()) partlySignedTx
                     else subFlow(CollectSignaturesFlow(
@@ -114,7 +114,7 @@ object MoveFlowsK {
                     .minus(ourIdentity)
                     .map { initiateFlow(it) }
                     // Prime these responders to act in a holder type of way.
-                    .onEach { it.send(ResponderType.Holder()) }
+                    .onEach { it.send(TransactionRole.OBSERVER) }
             return subFlow(FinalityFlow(
                     fullySignedTx,
                     signerFlows.plus(newHolderFlows),
@@ -129,11 +129,11 @@ object MoveFlowsK {
 
         @Suspendable
         override fun call(): SignedTransaction {
-            val myType = counterpartySession.receive<ResponderType>().unwrap { it }
-            val txId = when (myType) {
+            val myRole = counterpartySession.receive<TransactionRole>().unwrap { it }
+            val txId = when (myRole) {
                 // We do not need to sign.
-                is ResponderType.Holder -> null
-                is ResponderType.Signer -> {
+                TransactionRole.OBSERVER -> null
+                TransactionRole.PARTICIPANT -> {
                     val signTransactionFlow = object : SignTransactionFlow(counterpartySession) {
                         override fun checkTransaction(stx: SignedTransaction) {
                             responderCheck(stx)
@@ -151,7 +151,6 @@ object MoveFlowsK {
                     }
                     subFlow(signTransactionFlow).id
                 }
-                else -> throw NotImplementedError("Unknown ResponderType: $myType")
             }
 
             return subFlow(ReceiveFinalityFlow(counterpartySession, txId))
