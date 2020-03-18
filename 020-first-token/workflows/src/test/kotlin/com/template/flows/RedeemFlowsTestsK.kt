@@ -151,7 +151,6 @@ class RedeemFlowsTestsK {
 
     @Test
     fun `there is no recorded state after redeem`() {
-        val expected = createFrom(alice, bob, 10L)
         val tokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
 
         val flow = RedeemFlowsK.Initiator(tokens)
@@ -221,7 +220,7 @@ class RedeemFlowsTestsK {
         network.runNetwork()
         val signedTx = future.getOrThrow()
 
-        // We check the recorded transaction in all 3 vauls vaults.
+        // We check the recorded transaction in all 3 vaults.
         for (node in listOf(alice, bob, dan)) {
             val recordedTx = node.services.validatedTransactions.getTransaction(signedTx.id)!!
             val txInputs = recordedTx.tx.inputs
@@ -266,6 +265,66 @@ class RedeemFlowsTestsK {
             requireThat {
                 "Quantity must not be too high." using lowEnough
             }
+        }
+    }
+
+    @Test
+    fun `SimpleInitiator can collect the 2 expected tokens to redeem`() {
+        val expected0 = createFrom(alice, bob, 10L)
+        val expected1 = createFrom(alice, bob, 20L)
+        val tokens = alice.issueTokens(network, listOf(
+                NodeHolding(bob, 10L),
+                NodeHolding(bob, 20L),
+                NodeHolding(bob, 5L)))
+
+        val flow = RedeemFlowsK.SimpleInitiator(
+                tokens[0].state.notary,
+                alice.info.singleIdentity(),
+                bob.info.singleIdentity(),
+                30L)
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        val signedTx = future.getOrThrow()
+
+        // We check the recorded transaction in both vaults.
+        for (node in listOf(alice, bob)) {
+            val recordedTx = node.services.validatedTransactions.getTransaction(signedTx.id)!!
+            val txInputs = recordedTx.tx.inputs
+            assertEquals(2, txInputs.size)
+            assertEquals(expected0, node.services.toStateAndRef<TokenStateK>(txInputs[0]).state.data)
+            assertEquals(expected1, node.services.toStateAndRef<TokenStateK>(txInputs[1]).state.data)
+            assertTrue(recordedTx.tx.outputs.isEmpty())
+        }
+    }
+
+    @Test
+    fun `SimpleInitiator can collect the 3 expected tokens to redeem`() {
+        val expected0 = createFrom(alice, bob, 10L)
+        val expected1 = createFrom(alice, bob, 20L)
+        val expected2 = createFrom(alice, bob, 5L)
+        val tokens = alice.issueTokens(network, listOf(
+                NodeHolding(bob, 10L),
+                NodeHolding(bob, 20L),
+                NodeHolding(bob, 5L)))
+
+        val flow = RedeemFlowsK.SimpleInitiator(
+                tokens[0].state.notary,
+                alice.info.singleIdentity(),
+                bob.info.singleIdentity(),
+                35L)
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        val signedTx = future.getOrThrow()
+
+        // We check the recorded transaction in both vaults.
+        for (node in listOf(alice, bob)) {
+            val recordedTx = node.services.validatedTransactions.getTransaction(signedTx.id)!!
+            val txInputs = recordedTx.tx.inputs
+            assertEquals(3, txInputs.size)
+            assertEquals(expected0, node.services.toStateAndRef<TokenStateK>(txInputs[0]).state.data)
+            assertEquals(expected1, node.services.toStateAndRef<TokenStateK>(txInputs[1]).state.data)
+            assertEquals(expected2, node.services.toStateAndRef<TokenStateK>(txInputs[2]).state.data)
+            assertTrue(recordedTx.tx.outputs.isEmpty())
         }
     }
 

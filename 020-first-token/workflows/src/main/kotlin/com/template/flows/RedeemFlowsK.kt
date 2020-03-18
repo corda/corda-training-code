@@ -8,46 +8,13 @@ import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
+import net.corda.core.node.services.vault.PageSpecification
+import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 
 object RedeemFlowsK {
-
-    @StartableByRPC
-    class InitiatorSums(
-            private val notary: Party,
-            private val inputTokenSums: List<TokenStateK>) : FlowLogic<SignedTransaction>() {
-
-        @Suppress("ClassName")
-        companion object {
-            object FETCHING_TOKEN_STATES : ProgressTracker.Step("Fetching token states based on parameters.")
-            object HANDING_TO_INITIATOR : ProgressTracker.Step("Handing to proper initiator.") {
-                override fun childProgressTracker() = Initiator.tracker()
-            }
-
-            fun tracker() = ProgressTracker(
-                    FETCHING_TOKEN_STATES,
-                    HANDING_TO_INITIATOR)
-        }
-
-        override val progressTracker = tracker()
-
-        override fun call(): SignedTransaction {
-            progressTracker.currentStep = FETCHING_TOKEN_STATES
-
-            val inputStates = inputTokenSums
-                    .flatMap { serviceHub.vaultService.fetchWorthAtLeast(it, listOf(notary)) }
-
-            // TODO handle a Move so as to have the exact amount to pass next instead of just losing everything.
-
-            progressTracker.currentStep = HANDING_TO_INITIATOR
-            return subFlow(Initiator(
-                    inputStates,
-                    HANDING_TO_INITIATOR.childProgressTracker()))
-        }
-
-    }
 
     @InitiatingFlow
     @StartableByRPC
@@ -176,6 +143,112 @@ object RedeemFlowsK {
             val txId = subFlow(signTransactionFlow).id
             return subFlow(ReceiveFinalityFlow(counterpartySession, txId))
         }
+    }
+
+    /**
+     * This class associates a list of [TokenStateK] and the sum of their [TokenStateK.quantity]. This prevents
+     * constant recalculation.
+     */
+    data class StateAccumulator(val sum: Long = 0L, val states: List<StateAndRef<TokenStateK>> = listOf()) {
+
+        /**
+         * Joins 2 accumulators.
+         */
+        fun plus(other: StateAccumulator) = StateAccumulator(
+                Math.addExact(sum, other.sum),
+                states.plus(other.states))
+
+        /**
+         * Add a state to the list and update the sum as we do.
+         */
+        fun plus(state: StateAndRef<TokenStateK>) = StateAccumulator(
+                Math.addExact(sum, state.state.data.quantity),
+                states.plus(state))
+
+        /**
+         * Add a state only if the current sum is strictly below the max sum given.
+         */
+        fun plusIfSumBelow(state: StateAndRef<TokenStateK>, maxSum: Long) =
+                if (maxSum <= sum) this
+                else plus(state)
+    }
+
+    @StartableByRPC
+    /**
+     * Allows to redeem a specific quantity of fungible tokens, as it assists in fetching them in the vault.
+     */
+    class SimpleInitiator(
+            private val notary: Party,
+            private val issuer: Party,
+            private val holder: Party,
+            private val totalQuantity: Long) : FlowLogic<SignedTransaction>() {
+
+        @Suppress("ClassName")
+        companion object {
+            object FETCHING_TOKEN_STATES : ProgressTracker.Step("Fetching token states based on parameters.")
+            object MOVING_TO_EXACT_COUNT : ProgressTracker.Step("Moving token states so as to have an exact sum.")
+            object HANDING_TO_INITIATOR : ProgressTracker.Step("Handing to proper initiator.") {
+                override fun childProgressTracker() = Initiator.tracker()
+            }
+
+            fun tracker() = ProgressTracker(
+                    FETCHING_TOKEN_STATES,
+                    MOVING_TO_EXACT_COUNT,
+                    HANDING_TO_INITIATOR)
+        }
+
+        override val progressTracker = tracker()
+
+        private fun fetchWorthAtLeast(
+                remainingSum: Long,
+                criteria: QueryCriteria.VaultQueryCriteria = tokenCriteria(),
+                paging: PageSpecification = PageSpecification())
+                : StateAccumulator {
+            // We reached the desired state already.
+            if (remainingSum <= 0) return StateAccumulator()
+            val pagedStates = serviceHub.vaultService.queryBy(TokenStateK::class.java, criteria, paging).states
+            if (pagedStates.isEmpty()) throw IllegalArgumentException("Not enough states to reach sum.")
+
+            val fetched = pagedStates
+                    // The previous query cannot pre-filter by issuer so we need to drop some here.
+                    .filter { it.state.data.issuer == issuer }
+                    // We will keep only up to the point where we have have enough.
+                    .fold(RedeemFlowsK.StateAccumulator()) { accumulator, state ->
+                        accumulator.plusIfSumBelow(state, totalQuantity)
+                    }
+            // If not, let's fetch some more, possible an empty list.
+            return fetched.plus(fetchWorthAtLeast(
+                    // If this number is 0 or less, we will get an empty list.
+                    totalQuantity - fetched.sum,
+                    criteria,
+                    paging.copy(pageNumber = paging.pageNumber + 1)
+            ))
+        }
+
+        /**
+         * A basic search criteria for the vault.
+         */
+        private fun tokenCriteria() = QueryCriteria.VaultQueryCriteria()
+                .withContractStateTypes(setOf(TokenStateK::class.java))
+                .withParticipants(listOf(holder))
+                .withNotary(listOf(notary))
+
+        @Suspendable
+        override fun call(): SignedTransaction {
+            progressTracker.currentStep = FETCHING_TOKEN_STATES
+
+            val accumulated = fetchWorthAtLeast(totalQuantity)
+
+            progressTracker.currentStep = MOVING_TO_EXACT_COUNT
+            // TODO handle a Move so as to have the exact amount to pass next instead of potentially redeeming more
+            // than intended.
+
+            progressTracker.currentStep = HANDING_TO_INITIATOR
+            return subFlow(Initiator(
+                    accumulated.states,
+                    HANDING_TO_INITIATOR.childProgressTracker()))
+        }
+
     }
 
 }
