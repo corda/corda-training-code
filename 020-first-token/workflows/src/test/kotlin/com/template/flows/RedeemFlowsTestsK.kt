@@ -2,7 +2,6 @@ package com.template.flows
 
 import com.google.common.collect.ImmutableList
 import com.template.states.TokenStateK
-import net.corda.core.contracts.TransactionState
 import net.corda.core.utilities.getOrThrow
 import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.MockNetwork
@@ -47,7 +46,7 @@ class RedeemFlowsTestsK {
                 .outRefsOfType<TokenStateK>()
                 .single()
 
-        val flow = RedeemFlowsK.Initiator(listOf(bobToken.ref))
+        val flow = RedeemFlowsK.Initiator(listOf(bobToken))
         val future = bob.startFlow(flow)
         network.runNetwork()
         val signedTx = future.getOrThrow()

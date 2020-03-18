@@ -4,9 +4,8 @@ import co.paralleluniverse.fibers.Suspendable
 import com.template.contracts.TokenContractK.Commands.Redeem
 import com.template.states.TokenStateK
 import net.corda.core.contracts.Command
-import net.corda.core.contracts.StateRef
+import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.requireThat
-import net.corda.core.crypto.SecureHash
 import net.corda.core.flows.*
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
@@ -17,17 +16,12 @@ object RedeemFlowsK {
     @InitiatingFlow
     @StartableByRPC
     /**
-     * Started either by a [TokenStateK.holder] to redeem multiple states where it is one of the holders.
+     * Started by a [TokenStateK.holder] to redeem multiple states where it is one of the holders.
      * Because it is an [InitiatingFlow], its counterpart flow [Responder] is called automatically.
-     * This constructor would typically be called by RPC or by [FlowLogic.subFlow].
+     * This constructor would be called by RPC or by [FlowLogic.subFlow]. In particular one that, given sums, fetches
+     * states in the vault.
      */
-    class Initiator(private val inputTokens: List<StateRef>) : FlowLogic<SignedTransaction>() {
-
-        /**
-         * The only constructor that can be called from the CLI.
-         * Started by the holder to redeem a single state.
-         */
-        constructor(hash: SecureHash, index: Int) : this(listOf(StateRef(hash, index)))
+    class Initiator(private val inputTokens: List<StateAndRef<TokenStateK>>) : FlowLogic<SignedTransaction>() {
 
         @Suppress("ClassName")
         companion object {
@@ -56,16 +50,15 @@ object RedeemFlowsK {
         @Suspendable
         override fun call(): SignedTransaction {
             progressTracker.currentStep = GENERATING_TRANSACTION
-            val inputStateTokens = inputTokens
-                    .map { serviceHub.toStateAndRef<TokenStateK>(it) }
             // We can only make a transaction if all states have to be marked by the same notary.
             val notary = inputTokens
-                    .map { serviceHub.validatedTransactions.getTransaction(it.txhash)!!.notary!! }
+                    .map { it.state.notary }
                     .distinct()
                     .single()
 
-            val otherSigners = inputStateTokens
+            val otherSigners = inputTokens
                     .map { it.state.data }
+                    // Keep a mixed list of issuers and holders.
                     .flatMap { listOf(it.issuer, it.holder) }
                     // Remove duplicates as it would be an issue when initiating flows, at least.
                     .distinct()
@@ -78,7 +71,7 @@ object RedeemFlowsK {
                     otherSigners.plus(ourIdentity).map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
-            inputStateTokens.forEach { txBuilder.addInputState(it) }
+            inputTokens.forEach { txBuilder.addInputState(it) }
 
             progressTracker.currentStep = SIGNING_TRANSACTION
             // We are but one of the signers.
