@@ -2,6 +2,7 @@ package com.template.flows
 
 import com.google.common.collect.ImmutableList
 import com.template.states.TokenStateK
+import net.corda.core.flows.FlowException
 import net.corda.core.utilities.getOrThrow
 import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.MockNetwork
@@ -11,7 +12,9 @@ import net.corda.testing.node.TestCordapp
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -29,7 +32,10 @@ class RedeemFlowsTestsK {
     init {
         listOf(alice, bob, carly).forEach {
             it.registerInitiatedFlow(IssueFlowsK.Responder::class.java)
+            it.registerInitiatedFlow(RedeemFlowsK.Responder::class.java)
         }
+        dan.registerInitiatedFlow(IssueFlowsK.Responder::class.java)
+        dan.registerInitiatedFlow(OtherRedeemFlowsK.SkintResponder::class.java)
     }
 
     @Before
@@ -195,6 +201,42 @@ class RedeemFlowsTestsK {
         bob.assertHasStatesInVault(listOf())
         carly.assertHasStatesInVault(listOf())
         dan.assertHasStatesInVault(listOf())
+    }
+
+    @Test
+    fun `SkintHolderResponder lets pass low enough amounts`() {
+        val expected0 = createFrom(alice, bob, 10L)
+        val expected1 = createFrom(alice, dan, 20L)
+        val tokens = alice.issueTokens(network, listOf(
+                NodeHolding(bob, 10L),
+                NodeHolding(dan, 20L)))
+
+        val flow = RedeemFlowsK.Initiator(tokens)
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        val signedTx = future.getOrThrow()
+
+        // We check the recorded transaction in all 3 vauls vaults.
+        for (node in listOf(alice, bob, dan)) {
+            val recordedTx = node.services.validatedTransactions.getTransaction(signedTx.id)!!
+            val txInputs = recordedTx.tx.inputs
+            assertEquals(2, txInputs.size)
+            assertEquals(expected0, node.services.toStateAndRef<TokenStateK>(txInputs[0]).state.data)
+            assertEquals(expected1, node.services.toStateAndRef<TokenStateK>(txInputs[1]).state.data)
+            assertTrue(recordedTx.tx.outputs.isEmpty())
+        }
+    }
+
+    @Test
+    fun `SkintHolderResponder throws on high amounts`() {
+        val tokens = alice.issueTokens(network, listOf(
+                NodeHolding(bob, 10L),
+                NodeHolding(dan, 21L)))
+
+        val flow = RedeemFlowsK.Initiator(tokens)
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        assertFailsWith<FlowException> { future.getOrThrow() }
     }
 
 }

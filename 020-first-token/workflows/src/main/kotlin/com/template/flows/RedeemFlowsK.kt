@@ -100,18 +100,25 @@ object RedeemFlowsK {
     }
 
     @InitiatedBy(Initiator::class)
-    class Responder(private val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
+    open class Responder(private val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
+
+        protected open fun responderCheck(stx: SignedTransaction) = Unit
+
         @Suspendable
         override fun call(): SignedTransaction {
             val signTransactionFlow = object : SignTransactionFlow(counterpartySession) {
-                override fun checkTransaction(stx: SignedTransaction) = requireThat {
-                    // Notice that there is still a security risk here as my node can be asked to sign without my
-                    // human knowledge.
-                    // I must be relevant. We don't like signing irrelevant transactions.
-                    val relevant = stx.toLedgerTransaction(serviceHub, false)
-                            .inputsOfType<TokenStateK>()
-                            .any { it.issuer == ourIdentity || it.holder == ourIdentity }
-                    "I must be relevant." using relevant
+                override fun checkTransaction(stx: SignedTransaction) {
+                    responderCheck(stx)
+                    requireThat {
+                        // Notice that there is still a security risk here as my node can be asked to sign without my
+                        // human knowledge.
+                        // I must be relevant. We don't like signing irrelevant transactions.
+                        val relevant = stx.toLedgerTransaction(serviceHub, false)
+                                .inputsOfType<TokenStateK>()
+                                .any { it.issuer == ourIdentity || it.holder == ourIdentity }
+                        "I must be relevant." using relevant
+                        // We add our internal check for clients that want to extend this feature.
+                    }
                 }
             }
             val txId = subFlow(signTransactionFlow).id
