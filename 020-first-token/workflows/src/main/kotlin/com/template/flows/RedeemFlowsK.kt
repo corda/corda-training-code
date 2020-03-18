@@ -7,11 +7,47 @@ import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
+import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 
 object RedeemFlowsK {
+
+    @StartableByRPC
+    class InitiatorSums(
+            private val notary: Party,
+            private val inputTokenSums: List<TokenStateK>) : FlowLogic<SignedTransaction>() {
+
+        @Suppress("ClassName")
+        companion object {
+            object FETCHING_TOKEN_STATES : ProgressTracker.Step("Fetching token states based on parameters.")
+            object HANDING_TO_INITIATOR : ProgressTracker.Step("Handing to proper initiator.") {
+                override fun childProgressTracker() = Initiator.tracker()
+            }
+
+            fun tracker() = ProgressTracker(
+                    FETCHING_TOKEN_STATES,
+                    HANDING_TO_INITIATOR)
+        }
+
+        override val progressTracker = tracker()
+
+        override fun call(): SignedTransaction {
+            progressTracker.currentStep = FETCHING_TOKEN_STATES
+
+            val inputStates = inputTokenSums
+                    .flatMap { serviceHub.vaultService.fetchWorthAtLeast(it, listOf(notary)) }
+
+            // TODO handle a Move so as to have the exact amount to pass next instead of just losing everything.
+
+            progressTracker.currentStep = HANDING_TO_INITIATOR
+            return subFlow(Initiator(
+                    inputStates,
+                    HANDING_TO_INITIATOR.childProgressTracker()))
+        }
+
+    }
 
     @InitiatingFlow
     @StartableByRPC
@@ -21,7 +57,9 @@ object RedeemFlowsK {
      * This constructor would be called by RPC or by [FlowLogic.subFlow]. In particular one that, given sums, fetches
      * states in the vault.
      */
-    class Initiator(private val inputTokens: List<StateAndRef<TokenStateK>>) : FlowLogic<SignedTransaction>() {
+    class Initiator(
+            private val inputTokens: List<StateAndRef<TokenStateK>>,
+            override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
 
         @Suppress("ClassName")
         companion object {
@@ -44,8 +82,6 @@ object RedeemFlowsK {
                     FINALISING_TRANSACTION
             )
         }
-
-        override val progressTracker = tracker()
 
         @Suspendable
         override fun call(): SignedTransaction {
