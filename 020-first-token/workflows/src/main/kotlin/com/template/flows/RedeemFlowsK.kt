@@ -136,24 +136,40 @@ object RedeemFlowsK {
     }
 
     @InitiatedBy(Initiator::class)
+    /**
+     * When you create an initiator and an associated responder, you have no assurance that a peer will launch "your"
+     * responder when you launch "your" initiator. Your peer may:
+     *   - use a totally different one that nonetheless follows the same back and forth choreography.
+     *   - use a sub-class in order to reuse the work you did on "your" responder.
+     * Here we set up our responder to be able to be sub-classed by allowing others to introduce additional checks
+     * on the transaction to be signed.
+     * Additionally, when "your" responder is launched, you have no assurance that the peer that triggered the flow
+     * used "your" initiator. The initiating peer may well have used a sub-class of "your" initiator.
+     */
     open class Responder(private val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
 
-        protected open fun responderCheck(stx: SignedTransaction) = Unit
+        /**
+         * Peers can create sub-classes and extends the checks on the transaction by overriding this dummy function.
+         * In particular, peers will be well advised to add logic here to control whether they really want this
+         * transaction to happen.
+         */
+        protected open fun additionalChecks(stx: SignedTransaction) = Unit
 
         @Suspendable
         override fun call(): SignedTransaction {
             val signTransactionFlow = object : SignTransactionFlow(counterpartySession) {
                 override fun checkTransaction(stx: SignedTransaction) {
-                    responderCheck(stx)
+                    // We add our internal check for clients that want to extend this feature.
+                    additionalChecks(stx)
+                    // Here have the checks that presumably all peers will want to have. It is opinionated and peers
+                    // are free to not use this class if they want to.
                     requireThat {
-                        // Notice that there is still a security risk here as my node can be asked to sign without my
-                        // human knowledge.
-                        // I must be relevant. We don't like signing irrelevant transactions.
+                        // Here we only automatically check that it is technically satisfactory.
+                        // We don't like signing irrelevant transactions. I must be relevant.
                         val relevant = stx.toLedgerTransaction(serviceHub, false)
                                 .inputsOfType<TokenStateK>()
                                 .any { it.issuer == ourIdentity || it.holder == ourIdentity }
                         "I must be relevant." using relevant
-                        // We add our internal check for clients that want to extend this feature.
                     }
                 }
             }

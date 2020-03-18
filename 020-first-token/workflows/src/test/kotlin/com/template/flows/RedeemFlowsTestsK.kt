@@ -2,7 +2,11 @@ package com.template.flows
 
 import com.google.common.collect.ImmutableList
 import com.template.states.TokenStateK
+import net.corda.core.contracts.requireThat
 import net.corda.core.flows.FlowException
+import net.corda.core.flows.FlowSession
+import net.corda.core.flows.InitiatedBy
+import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.getOrThrow
 import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.MockNetwork
@@ -12,7 +16,6 @@ import net.corda.testing.node.TestCordapp
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
@@ -35,7 +38,7 @@ class RedeemFlowsTestsK {
             it.registerInitiatedFlow(RedeemFlowsK.Responder::class.java)
         }
         dan.registerInitiatedFlow(IssueFlowsK.Responder::class.java)
-        dan.registerInitiatedFlow(OtherRedeemFlowsK.SkintResponder::class.java)
+        dan.registerInitiatedFlow(SkintResponder::class.java)
     }
 
     @Before
@@ -203,6 +206,8 @@ class RedeemFlowsTestsK {
         dan.assertHasStatesInVault(listOf())
     }
 
+    // The below tests use a specific responder that is defined at the end.
+
     @Test
     fun `SkintHolderResponder lets pass low enough amounts`() {
         val expected0 = createFrom(alice, bob, 10L)
@@ -237,6 +242,31 @@ class RedeemFlowsTestsK {
         val future = bob.startFlow(flow)
         network.runNetwork()
         assertFailsWith<FlowException> { future.getOrThrow() }
+    }
+
+    @InitiatedBy(RedeemFlowsK.Initiator::class)
+    /**
+     * This is an example of another responder that sub-classes the basic Responder.
+     */
+    class SkintResponder(counterpartySession: FlowSession) : RedeemFlowsK.Responder(counterpartySession) {
+
+        companion object {
+            const val MAX_QUANTITY = 20L
+        }
+
+        override fun additionalChecks(stx: SignedTransaction) {
+            super.additionalChecks(stx)
+            val lowEnough = stx.toLedgerTransaction(serviceHub, false)
+                    .inputsOfType<TokenStateK>()
+                    // It only cares if we are a holder
+                    .filter { it.holder == ourIdentity }
+                    // No individual token should have a quantity too high. That's a strange requirement, but it is
+                    // here to make a point.
+                    .all { it.quantity <= MAX_QUANTITY }
+            requireThat {
+                "Quantity must not be too high." using lowEnough
+            }
+        }
     }
 
 }
