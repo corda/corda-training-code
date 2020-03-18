@@ -3,6 +3,7 @@ package com.template.flows
 import com.google.common.collect.ImmutableList
 import com.template.states.TokenStateK
 import net.corda.core.utilities.getOrThrow
+import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.MockNetwork
 import net.corda.testing.node.MockNetworkNotarySpec
 import net.corda.testing.node.MockNetworkParameters
@@ -50,6 +51,20 @@ class RedeemFlowsTestsK {
     }
 
     @Test
+    fun `SignedTransaction returned by the flow is signed by both issuers and the holder`() {
+        val tokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+                .plus(carly.issueTokens(network, listOf(NodeHolding(bob, 20L))))
+
+        val flow = RedeemFlowsK.Initiator(tokens)
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        val signedTx = future.getOrThrow()
+        signedTx.verifySignaturesExcept(listOf(bob.info.singleIdentity().owningKey, carly.info.singleIdentity().owningKey))
+        signedTx.verifySignaturesExcept(listOf(alice.info.singleIdentity().owningKey, carly.info.singleIdentity().owningKey))
+        signedTx.verifySignaturesExcept(listOf(alice.info.singleIdentity().owningKey, bob.info.singleIdentity().owningKey))
+    }
+
+    @Test
     fun `flow records a transaction in issuer and holder transaction storages only`() {
         val tokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
 
@@ -63,6 +78,25 @@ class RedeemFlowsTestsK {
             assertEquals(signedTx, node.services.validatedTransactions.getTransaction(signedTx.id))
         }
         for (node in listOf(carly, dan)) {
+            assertNull(node.services.validatedTransactions.getTransaction(signedTx.id))
+        }
+    }
+
+    @Test
+    fun `flow records a transaction in both issuers and holder transaction storages only`() {
+        val tokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+                .plus(carly.issueTokens(network, listOf(NodeHolding(bob, 20L))))
+
+        val flow = RedeemFlowsK.Initiator(tokens)
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        val signedTx = future.getOrThrow()
+
+        // We check the recorded transaction in both transaction storages.
+        for (node in listOf(alice, bob, carly)) {
+            assertEquals(signedTx, node.services.validatedTransactions.getTransaction(signedTx.id))
+        }
+        for (node in listOf(dan)) {
             assertNull(node.services.validatedTransactions.getTransaction(signedTx.id))
         }
     }
