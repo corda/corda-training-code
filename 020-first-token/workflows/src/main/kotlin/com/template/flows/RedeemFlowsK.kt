@@ -21,10 +21,13 @@ object RedeemFlowsK {
     /**
      * Started by a [TokenStateK.holder] to redeem multiple states where it is one of the holders.
      * Because it is an [InitiatingFlow], its counterpart flow [Responder] is called automatically.
-     * This constructor would be called by RPC or by [FlowLogic.subFlow]. In particular one that, given sums, fetches
-     * states in the vault.
+     * This constructor would be called by RPC or by [FlowLogic.subFlow]. In particular one that would be more
+     * user-friendly in terms of parameters passed. For instance, given sums, it would fetch the precise states in
+     * the vault. Look at [SimpleInitiator] for such an example.
      */
     class Initiator(
+            // By requiring an exact list of states, this flow assures absolute precision at the expense of
+            // user-friendliness.
             private val inputTokens: List<StateAndRef<TokenStateK>>,
             override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
 
@@ -146,11 +149,10 @@ object RedeemFlowsK {
     }
 
     /**
-     * This class associates a list of [TokenStateK] and the sum of their [TokenStateK.quantity]. This prevents
+     * This class associates a list of [TokenStateK] and the sum of their [TokenStateK.quantity]. This helps us avoid
      * constant recalculation.
      */
     data class StateAccumulator(val sum: Long = 0L, val states: List<StateAndRef<TokenStateK>> = listOf()) {
-
         /**
          * Joins 2 accumulators.
          */
@@ -178,9 +180,9 @@ object RedeemFlowsK {
      * Allows to redeem a specific quantity of fungible tokens, as it assists in fetching them in the vault.
      */
     class SimpleInitiator(
-            private val notary: Party,
+            notary: Party,
             private val issuer: Party,
-            private val holder: Party,
+            holder: Party,
             private val totalQuantity: Long) : FlowLogic<SignedTransaction>() {
 
         @Suppress("ClassName")
@@ -198,45 +200,43 @@ object RedeemFlowsK {
         }
 
         override val progressTracker = tracker()
+        /**
+         * A basic search criteria for the vault.
+         */
+        private val tokenCriteria = QueryCriteria.VaultQueryCriteria()
+                .withParticipants(listOf(holder))
+                .withNotary(listOf(notary))
 
         private fun fetchWorthAtLeast(
                 remainingSum: Long,
-                criteria: QueryCriteria.VaultQueryCriteria = tokenCriteria(),
-                paging: PageSpecification = PageSpecification())
+                paging: PageSpecification = PageSpecification(1))
                 : StateAccumulator {
             // We reached the desired state already.
             if (remainingSum <= 0) return StateAccumulator()
-            val pagedStates = serviceHub.vaultService.queryBy(TokenStateK::class.java, criteria, paging).states
-            if (pagedStates.isEmpty()) throw IllegalArgumentException("Not enough states to reach sum.")
+            val pagedStates = serviceHub.vaultService
+                    .queryBy(TokenStateK::class.java, tokenCriteria, paging)
+                    .states
+            if (pagedStates.isEmpty()) throw FlowException("Not enough states to reach sum.")
 
             val fetched = pagedStates
                     // The previous query cannot pre-filter by issuer so we need to drop some here.
                     .filter { it.state.data.issuer == issuer }
                     // We will keep only up to the point where we have have enough.
-                    .fold(RedeemFlowsK.StateAccumulator()) { accumulator, state ->
+                    .fold(StateAccumulator()) { accumulator, state ->
                         accumulator.plusIfSumBelow(state, totalQuantity)
                     }
-            // If not, let's fetch some more, possible an empty list.
+            // Let's fetch some more, possibly an empty list.
             return fetched.plus(fetchWorthAtLeast(
                     // If this number is 0 or less, we will get an empty list.
                     totalQuantity - fetched.sum,
-                    criteria,
+                    // Take the next page
                     paging.copy(pageNumber = paging.pageNumber + 1)
             ))
         }
 
-        /**
-         * A basic search criteria for the vault.
-         */
-        private fun tokenCriteria() = QueryCriteria.VaultQueryCriteria()
-                .withContractStateTypes(setOf(TokenStateK::class.java))
-                .withParticipants(listOf(holder))
-                .withNotary(listOf(notary))
-
         @Suspendable
         override fun call(): SignedTransaction {
             progressTracker.currentStep = FETCHING_TOKEN_STATES
-
             val accumulated = fetchWorthAtLeast(totalQuantity)
 
             progressTracker.currentStep = MOVING_TO_EXACT_COUNT

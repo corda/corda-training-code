@@ -328,4 +328,20 @@ class RedeemFlowsTestsK {
         }
     }
 
+    @Test
+    fun `SimpleInitiator fails to collect if there are not enough tokens to redeem`() {
+        val tokens = alice.issueTokens(network, listOf(
+                NodeHolding(bob, 10L),
+                NodeHolding(bob, 20L)))
+
+        val flow = RedeemFlowsK.SimpleInitiator(
+                tokens[0].state.notary,
+                alice.info.singleIdentity(),
+                bob.info.singleIdentity(),
+                35L)
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        assertFailsWith<FlowException> { future.getOrThrow() }
+    }
+
 }
