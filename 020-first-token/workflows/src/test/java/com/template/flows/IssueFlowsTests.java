@@ -53,8 +53,8 @@ public class IssueFlowsTests {
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
 
-        final SignedTransaction signedTx = future.get();
-        signedTx.verifyRequiredSignatures();
+        final SignedTransaction tx = future.get();
+        tx.verifyRequiredSignatures();
     }
 
     @Test
@@ -62,14 +62,14 @@ public class IssueFlowsTests {
         final IssueFlows.Initiator flow = new IssueFlows.Initiator(bob.getInfo().getLegalIdentities().get(0), 10L);
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
-        final SignedTransaction signedTx = future.get();
+        final SignedTransaction tx = future.get();
 
         // We check the recorded transaction in both transaction storages.
         for (StartedMockNode node : ImmutableList.of(alice, bob)) {
-            assertEquals(signedTx, node.getServices().getValidatedTransactions().getTransaction(signedTx.getId()));
+            assertEquals(tx, node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
         }
         for (StartedMockNode node : ImmutableList.of(carly, dan)) {
-            assertNull(node.getServices().getValidatedTransactions().getTransaction(signedTx.getId()));
+            assertNull(node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
         }
     }
 
@@ -80,13 +80,13 @@ public class IssueFlowsTests {
                 new Pair<>(carly.getInfo().getLegalIdentities().get(0), 20L)));
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
-        final SignedTransaction signedTx = future.get();
+        final SignedTransaction tx = future.get();
 
         // We check the recorded transaction in transaction storages.
         for (StartedMockNode node : ImmutableList.of(alice, bob, carly)) {
-            assertEquals(signedTx, node.getServices().getValidatedTransactions().getTransaction(signedTx.getId()));
+            assertEquals(tx, node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
         }
-        assertNull(dan.getServices().getValidatedTransactions().getTransaction(signedTx.getId()));
+        assertNull(dan.getServices().getValidatedTransactions().getTransaction(tx.getId()));
     }
 
     @Test
@@ -96,11 +96,11 @@ public class IssueFlowsTests {
         final IssueFlows.Initiator flow = new IssueFlows.Initiator(expected.getHolder(), expected.getQuantity());
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
-        final SignedTransaction signedTx = future.get();
+        final SignedTransaction tx = future.get();
 
         // We check the recorded transaction in both vaults.
         for (StartedMockNode node : ImmutableList.of(alice, bob)) {
-            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(signedTx.getId());
+            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
             assertNotNull(recordedTx);
             assertTrue(recordedTx.getTx().getInputs().isEmpty());
             final List<TransactionState<ContractState>> txOutputs = recordedTx.getTx().getOutputs();
@@ -133,11 +133,11 @@ public class IssueFlowsTests {
                 toPair(expected2)));
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
-        final SignedTransaction signedTx = future.get();
+        final SignedTransaction tx = future.get();
 
         // We check the recorded transaction in the 3 vaults.
         for (StartedMockNode node : ImmutableList.of(alice, bob, carly)) {
-            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(signedTx.getId());
+            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
             assertNotNull(recordedTx);
             assertTrue(recordedTx.getTx().getInputs().isEmpty());
             final List<TransactionState<ContractState>> txOutputs = recordedTx.getTx().getOutputs();
@@ -177,11 +177,11 @@ public class IssueFlowsTests {
                 toPair(expected2)));
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
-        final SignedTransaction signedTx = future.get();
+        final SignedTransaction tx = future.get();
 
         // We check the recorded transaction in both vaults.
         for (StartedMockNode node : ImmutableList.of(alice, bob)) {
-            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(signedTx.getId());
+            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
             assertNotNull(recordedTx);
             assertTrue(recordedTx.getTx().getInputs().isEmpty());
             final List<TransactionState<ContractState>> txOutputs = recordedTx.getTx().getOutputs();

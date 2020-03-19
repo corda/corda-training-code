@@ -30,35 +30,42 @@ public interface IssueFlows {
     @StartableByRPC
     class Initiator extends FlowLogic<SignedTransaction> {
 
-        @SuppressWarnings("DanglingJavadoc")
-        @NotNull
         /**
          * It may contain a given {@link Party} more than once, so that we can issue multiple states to a given holder.
          */
+        @NotNull
         private final List<Pair<Party, Long>> heldQuantities;
+        @NotNull
+        private final ProgressTracker progressTracker;
 
-        private final Step GENERATING_TRANSACTION = new Step("Generating transaction based on new IOU.");
-        private final Step VERIFYING_TRANSACTION = new Step("Verifying contract constraints.");
-        private final Step SIGNING_TRANSACTION = new Step("Signing transaction with our private key.");
-        private final Step FINALISING_TRANSACTION = new Step("Obtaining notary signature and recording transaction.") {
+        private final static Step GENERATING_TRANSACTION = new Step("Generating transaction based on parameters.");
+        private final static Step VERIFYING_TRANSACTION = new Step("Verifying contract constraints.");
+        private final static Step SIGNING_TRANSACTION = new Step("Signing transaction with our private key.");
+        private final static Step FINALISING_TRANSACTION = new Step("Obtaining notary signature and recording transaction.") {
             @Override
             public ProgressTracker childProgressTracker() {
                 return FinalityFlow.Companion.tracker();
             }
         };
 
-        private final ProgressTracker progressTracker = new ProgressTracker(
-                GENERATING_TRANSACTION,
-                VERIFYING_TRANSACTION,
-                SIGNING_TRANSACTION,
-                FINALISING_TRANSACTION
-        );
+        @NotNull
+        public static ProgressTracker tracker() {
+            return new ProgressTracker(
+                    GENERATING_TRANSACTION,
+                    VERIFYING_TRANSACTION,
+                    SIGNING_TRANSACTION,
+                    FINALISING_TRANSACTION
+            );
+        }
 
         /**
          * This constructor would typically be called by RPC or by {@link FlowLogic#subFlow}.
          */
         public Initiator(@NotNull final List<Pair<Party, Long>> heldQuantities) {
+            //noinspection ConstantConditions
+            if (heldQuantities == null) throw new NullPointerException("heldQuantities cannot be null");
             this.heldQuantities = heldQuantities;
+            this.progressTracker = tracker();
         }
 
         /**
@@ -69,6 +76,7 @@ public interface IssueFlows {
             this(Collections.singletonList(new Pair<>(holder, quantity)));
         }
 
+        @NotNull
         @Override
         public ProgressTracker getProgressTracker() {
             return progressTracker;

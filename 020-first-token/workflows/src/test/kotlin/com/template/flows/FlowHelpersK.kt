@@ -29,8 +29,8 @@ class NodeHolding(val holder: StartedMockNode, val quantity: Long) {
     fun toPair() = Pair(holder.info.singleIdentity(), quantity)
 }
 
-fun StartedMockNode.issueTokens(network: MockNetwork, nodeHolding: Collection<NodeHolding>) =
-        IssueFlowsK.Initiator(nodeHolding.map(NodeHolding::toPair))
+fun StartedMockNode.issueTokens(network: MockNetwork, nodeHoldings: Collection<NodeHolding>) =
+        IssueFlowsK.Initiator(nodeHoldings.map(NodeHolding::toPair))
                 .let { startFlow(it) }
                 .also { network.runNetwork() }
                 .getOrThrow()
