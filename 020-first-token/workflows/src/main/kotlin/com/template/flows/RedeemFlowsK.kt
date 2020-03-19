@@ -49,8 +49,7 @@ object RedeemFlowsK {
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,
                     VERIFYING_TRANSACTION,
-                    FINALISING_TRANSACTION
-            )
+                    FINALISING_TRANSACTION)
         }
 
         @Suspendable
@@ -116,8 +115,25 @@ object RedeemFlowsK {
      * Additionally, when "your" responder is launched, you have no assurance that the peer that triggered the flow
      * used "your" initiator. The initiating peer may well have used a sub-class of "your" initiator.
      */
-    open class Responder(private val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
+    open class Responder(
+            private val counterpartySession: FlowSession,
+            override val progressTracker: ProgressTracker) : FlowLogic<SignedTransaction>() {
 
+        constructor(counterpartySession: FlowSession) :this(counterpartySession, tracker())
+
+        @Suppress("ClassName")
+        companion object {
+            object SIGNING_TRANSACTION : ProgressTracker.Step("About to sign transaction with our private key.") {
+                override fun childProgressTracker() = SignTransactionFlow.tracker()
+            }
+            object FINALISING_TRANSACTION : ProgressTracker.Step("Waiting to record transaction.") {
+                override fun childProgressTracker() = FinalityFlow.tracker()
+            }
+
+            fun tracker() = ProgressTracker(
+                    SIGNING_TRANSACTION,
+                    FINALISING_TRANSACTION)
+        }
         /**
          * Peers can create sub-classes and extends the checks on the transaction by overriding this dummy function.
          * In particular, peers will be well advised to add logic here to control whether they really want this
@@ -127,7 +143,10 @@ object RedeemFlowsK {
 
         @Suspendable
         override fun call(): SignedTransaction {
-            val signTransactionFlow = object : SignTransactionFlow(counterpartySession) {
+            progressTracker.currentStep = SIGNING_TRANSACTION
+            val signTransactionFlow = object : SignTransactionFlow(
+                    counterpartySession,
+                    SIGNING_TRANSACTION.childProgressTracker()) {
                 override fun checkTransaction(stx: SignedTransaction) {
                     // We add our internal check for clients that want to extend this feature.
                     additionalChecks(stx)
@@ -144,6 +163,8 @@ object RedeemFlowsK {
                 }
             }
             val txId = subFlow(signTransactionFlow).id
+
+            progressTracker.currentStep = FINALISING_TRANSACTION
             return subFlow(ReceiveFinalityFlow(counterpartySession, txId))
         }
     }
@@ -152,7 +173,12 @@ object RedeemFlowsK {
      * This class associates a list of [TokenStateK] and the sum of their [TokenStateK.quantity]. This helps us avoid
      * constant recalculation.
      */
-    data class StateAccumulator(val sum: Long = 0L, val states: List<StateAndRef<TokenStateK>> = listOf()) {
+    class StateAccumulator private constructor(val sum: Long, val states: List<StateAndRef<TokenStateK>>) {
+
+        constructor(states: List<StateAndRef<TokenStateK>> = listOf()) : this(
+                states.fold(0L) { sum, state -> Math.addExact(sum, state.state.data.quantity) },
+                states)
+
         /**
          * Joins 2 accumulators.
          */
@@ -183,7 +209,20 @@ object RedeemFlowsK {
             notary: Party,
             private val issuer: Party,
             holder: Party,
-            private val totalQuantity: Long) : FlowLogic<SignedTransaction>() {
+            private val totalQuantity: Long,
+            override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
+
+        /**
+         * A basic search criteria for the vault.
+         */
+        private val tokenCriteria: QueryCriteria
+
+        init {
+            if (totalQuantity <= 0) throw IllegalArgumentException("totalQuantity must be positive")
+            tokenCriteria = QueryCriteria.VaultQueryCriteria()
+                    .withParticipants(listOf(holder))
+                    .withNotary(listOf(notary))
+        }
 
         @Suppress("ClassName")
         companion object {
@@ -198,14 +237,6 @@ object RedeemFlowsK {
                     MOVING_TO_EXACT_COUNT,
                     HANDING_TO_INITIATOR)
         }
-
-        override val progressTracker = tracker()
-        /**
-         * A basic search criteria for the vault.
-         */
-        private val tokenCriteria = QueryCriteria.VaultQueryCriteria()
-                .withParticipants(listOf(holder))
-                .withNotary(listOf(notary))
 
         private fun fetchWorthAtLeast(
                 remainingSum: Long,
@@ -236,6 +267,7 @@ object RedeemFlowsK {
 
         @Suspendable
         override fun call(): SignedTransaction {
+
             progressTracker.currentStep = FETCHING_TOKEN_STATES
             val accumulated = fetchWorthAtLeast(totalQuantity)
 
