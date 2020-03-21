@@ -129,10 +129,32 @@ object MoveFlowsK {
     @InitiatedBy(Initiator::class)
     open class Responder(private val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
 
+        @Suppress("ClassName")
+        companion object {
+            object RECEIVING_ROLE : ProgressTracker.Step("Receiving role to impersonate.")
+            object SIGNING_TRANSACTION : ProgressTracker.Step("Signing transaction with our private key.") {
+                override fun childProgressTracker() = SignTransactionFlow.tracker()
+            }
+
+            object FINALISING_TRANSACTION : ProgressTracker.Step("Obtaining notary signature and recording transaction.") {
+                override fun childProgressTracker() = FinalityFlow.tracker()
+            }
+
+            fun tracker() = ProgressTracker(
+                    RECEIVING_ROLE,
+                    SIGNING_TRANSACTION,
+                    FINALISING_TRANSACTION
+            )
+        }
+
+        override val progressTracker = tracker()
 
         @Suspendable
         override fun call(): SignedTransaction {
+            progressTracker.currentStep = RECEIVING_ROLE
             val myRole = counterpartySession.receive<TransactionRole>().unwrap { it }
+
+            progressTracker.currentStep = SIGNING_TRANSACTION
             val txId = when (myRole) {
                 // We do not need to sign.
                 TransactionRole.OBSERVER -> null
@@ -155,6 +177,7 @@ object MoveFlowsK {
                 }
             }
 
+            progressTracker.currentStep = FINALISING_TRANSACTION
             return subFlow(ReceiveFinalityFlow(counterpartySession, txId))
         }
     }
