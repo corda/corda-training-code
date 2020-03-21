@@ -72,6 +72,7 @@ object MoveFlowsK {
                     .map { it.state.data.holder }
                     // Remove duplicates as it would be an issue when initiating flows, at least.
                     .distinct()
+                    // We don't want to sign transactions where our signature is not needed.
                     .also { require(it.contains(ourIdentity)) { "I must be a holder." } }
                     // Remove myself.
                     .minus(ourIdentity)
@@ -110,13 +111,16 @@ object MoveFlowsK {
             val newHolderFlows = outputTokens
                     .map { it.holder }
                     .distinct()
+                    // The signers are being handled in the other flows.
                     .minus(signers)
+                    // We don't need to inform ourselves.
                     .minus(ourIdentity)
                     .map { initiateFlow(it) }
                     // Prime these responders to act in a holder type of way.
                     .onEach { it.send(TransactionRole.OBSERVER) }
             return subFlow(FinalityFlow(
                     fullySignedTx,
+                    // All of them need to finalise.
                     signerFlows.plus(newHolderFlows),
                     FINALISING_TRANSACTION.childProgressTracker()))
         }
@@ -125,7 +129,6 @@ object MoveFlowsK {
     @InitiatedBy(Initiator::class)
     open class Responder(private val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
 
-        protected open fun responderCheck(stx: SignedTransaction) = Unit
 
         @Suspendable
         override fun call(): SignedTransaction {
@@ -136,7 +139,6 @@ object MoveFlowsK {
                 TransactionRole.PARTICIPANT -> {
                     val signTransactionFlow = object : SignTransactionFlow(counterpartySession) {
                         override fun checkTransaction(stx: SignedTransaction) {
-                            responderCheck(stx)
                             requireThat {
                                 // Notice that there is still a security risk here as my node can be asked to sign
                                 // without my human knowledge.

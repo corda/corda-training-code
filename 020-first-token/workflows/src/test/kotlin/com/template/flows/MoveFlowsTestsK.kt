@@ -2,6 +2,7 @@ package com.template.flows
 
 import com.google.common.collect.ImmutableList
 import com.template.states.TokenStateK
+import net.corda.core.flows.FlowException
 import net.corda.core.utilities.getOrThrow
 import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.MockNetwork
@@ -12,6 +13,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class MoveFlowsTestsK {
@@ -39,10 +41,23 @@ class MoveFlowsTestsK {
     fun tearDown() = network.stopNodes()
 
     @Test
-    fun `SignedTransaction returned by the flow is signed by the holder`() {
-        val tokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+    fun `flow fails when initiator is missing transactions they were not party to`() {
+        val issuedTokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+                .plus(carly.issueTokens(network, listOf(NodeHolding(dan, 20L))))
 
-        val flow = MoveFlowsK.Initiator(tokens, listOf(createFrom(alice, carly, 10L)))
+        val flow = MoveFlowsK.Initiator(issuedTokens, listOf(
+                createFrom(alice, dan, 10L),
+                createFrom(carly, bob, 20L)))
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        assertFailsWith<FlowException> { future.getOrThrow() }
+    }
+
+    @Test
+    fun `SignedTransaction returned by the flow is signed by the holder`() {
+        val issuedTokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+
+        val flow = MoveFlowsK.Initiator(issuedTokens, listOf(createFrom(alice, carly, 10L)))
         val future = bob.startFlow(flow)
         network.runNetwork()
         val tx = future.getOrThrow()
@@ -51,11 +66,11 @@ class MoveFlowsTestsK {
 
     @Test
     fun `SignedTransaction returned by the flow is signed by both holders, same issuer`() {
-        val tokens = alice.issueTokens(network, listOf(
+        val issuedTokens = alice.issueTokens(network, listOf(
                 NodeHolding(bob, 10L),
                 NodeHolding(carly, 20L)))
 
-        val flow = MoveFlowsK.Initiator(tokens, listOf(createFrom(alice, dan, 30L)))
+        val flow = MoveFlowsK.Initiator(issuedTokens, listOf(createFrom(alice, dan, 30L)))
         val future = bob.startFlow(flow)
         network.runNetwork()
         val tx = future.getOrThrow()
@@ -64,9 +79,9 @@ class MoveFlowsTestsK {
 
     @Test
     fun `flow records a transaction in holder transaction storages only`() {
-        val tokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+        val issuedTokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
 
-        val flow = MoveFlowsK.Initiator(tokens, listOf(createFrom(alice, carly, 10L)))
+        val flow = MoveFlowsK.Initiator(issuedTokens, listOf(createFrom(alice, carly, 10L)))
         val future = bob.startFlow(flow)
         network.runNetwork()
         val tx = future.getOrThrow()
@@ -82,11 +97,11 @@ class MoveFlowsTestsK {
 
     @Test
     fun `flow records a transaction in both holders transaction storages, same issuer`() {
-        val tokens = alice.issueTokens(network, listOf(
+        val issuedTokens = alice.issueTokens(network, listOf(
                 NodeHolding(bob, 10L),
                 NodeHolding(carly, 20L)))
 
-        val flow = MoveFlowsK.Initiator(tokens, listOf(createFrom(alice, dan, 30L)))
+        val flow = MoveFlowsK.Initiator(issuedTokens, listOf(createFrom(alice, dan, 30L)))
         val future = bob.startFlow(flow)
         network.runNetwork()
         val tx = future.getOrThrow()
@@ -100,11 +115,11 @@ class MoveFlowsTestsK {
 
     @Test
     fun `recorded transaction has a single input and a single output`() {
-        val tokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
-        val expectedInput = tokens[0].state.data
+        val issuedTokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+        val expectedInput = issuedTokens[0].state.data
         val expectedOutput = createFrom(alice, carly, 10L)
 
-        val flow = MoveFlowsK.Initiator(tokens, listOf(expectedOutput))
+        val flow = MoveFlowsK.Initiator(issuedTokens, listOf(expectedOutput))
         val future = bob.startFlow(flow)
         network.runNetwork()
         val tx = future.getOrThrow()
@@ -126,13 +141,13 @@ class MoveFlowsTestsK {
 
     @Test
     fun `recorded transaction has two inputs and 1 output, same issuer`() {
-        val tokens = alice.issueTokens(network, listOf(
+        val issuedTokens = alice.issueTokens(network, listOf(
                 NodeHolding(bob, 10L),
                 NodeHolding(carly, 20L)))
-        val expectedInputs = tokens.map { it.state.data }
+        val expectedInputs = issuedTokens.map { it.state.data }
         val expectedOutput = createFrom(alice, dan, 30L)
 
-        val flow = MoveFlowsK.Initiator(tokens, listOf(expectedOutput))
+        val flow = MoveFlowsK.Initiator(issuedTokens, listOf(expectedOutput))
         val future = bob.startFlow(flow)
         network.runNetwork()
         val tx = future.getOrThrow()
