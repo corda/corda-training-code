@@ -119,13 +119,14 @@ object RedeemFlowsK {
             private val counterpartySession: FlowSession,
             override val progressTracker: ProgressTracker) : FlowLogic<SignedTransaction>() {
 
-        constructor(counterpartySession: FlowSession) :this(counterpartySession, tracker())
+        constructor(counterpartySession: FlowSession) : this(counterpartySession, tracker())
 
         @Suppress("ClassName")
         companion object {
             object SIGNING_TRANSACTION : ProgressTracker.Step("About to sign transaction with our private key.") {
                 override fun childProgressTracker() = SignTransactionFlow.tracker()
             }
+
             object FINALISING_TRANSACTION : ProgressTracker.Step("Waiting to record transaction.") {
                 override fun childProgressTracker() = FinalityFlow.tracker()
             }
@@ -134,6 +135,7 @@ object RedeemFlowsK {
                     SIGNING_TRANSACTION,
                     FINALISING_TRANSACTION)
         }
+
         /**
          * Peers can create sub-classes and extends the checks on the transaction by overriding this dummy function.
          * In particular, peers will be well advised to add logic here to control whether they really want this
@@ -210,7 +212,8 @@ object RedeemFlowsK {
             private val issuer: Party,
             holder: Party,
             private val totalQuantity: Long,
-            override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
+            override val progressTracker: ProgressTracker = tracker())
+        : FlowLogic<Pair<SignedTransaction?, SignedTransaction>>() {
 
         /**
          * A basic search criteria for the vault.
@@ -266,19 +269,26 @@ object RedeemFlowsK {
         }
 
         @Suspendable
-        override fun call(): SignedTransaction {
+        override fun call(): Pair<SignedTransaction?, SignedTransaction> {
 
             progressTracker.currentStep = FETCHING_TOKEN_STATES
             val accumulated = fetchWorthAtLeast(totalQuantity)
 
             progressTracker.currentStep = MOVING_TO_EXACT_COUNT
-            // TODO handle a Move so as to have the exact amount to pass next instead of potentially redeeming more
-            // than intended.
+            // If we did not get an exact amount, we need to create some change for ourselves before we redeem the
+            // exact quantity wanted.
+            val moveTx = if (accumulated.sum <= totalQuantity) null
+            else subFlow(MoveFlowsK.Initiator(accumulated.states, listOf(
+                    TokenStateK(issuer, ourIdentity, totalQuantity),
+                    TokenStateK(issuer, ourIdentity, accumulated.sum - totalQuantity))))
+
+            val toUse = if (moveTx == null) accumulated.states
+            else listOf(moveTx.toLedgerTransaction(serviceHub).outRefsOfType<TokenStateK>().get(0))
 
             progressTracker.currentStep = HANDING_TO_INITIATOR
-            return subFlow(Initiator(
-                    accumulated.states,
-                    HANDING_TO_INITIATOR.childProgressTracker()))
+            return Pair(moveTx, subFlow(Initiator(
+                    toUse,
+                    HANDING_TO_INITIATOR.childProgressTracker())))
         }
 
     }

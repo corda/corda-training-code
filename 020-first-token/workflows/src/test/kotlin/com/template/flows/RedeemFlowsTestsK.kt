@@ -282,11 +282,12 @@ class RedeemFlowsTestsK {
                 30L)
         val future = bob.startFlow(flow)
         network.runNetwork()
-        val tx = future.getOrThrow()
+        val txPair = future.getOrThrow()
 
         // We check the recorded transaction in both vaults.
         for (node in listOf(alice, bob)) {
-            val recordedTx = node.services.validatedTransactions.getTransaction(tx.id)!!
+            assertNull(txPair.first)
+            val recordedTx = node.services.validatedTransactions.getTransaction(txPair.second.id)!!
             val txInputs = recordedTx.tx.inputs
             assertEquals(2, txInputs.size)
             assertEquals(expected0, node.services.toStateAndRef<TokenStateK>(txInputs[0]).state.data)
@@ -312,11 +313,12 @@ class RedeemFlowsTestsK {
                 35L)
         val future = bob.startFlow(flow)
         network.runNetwork()
-        val tx = future.getOrThrow()
+        val txPair = future.getOrThrow()
 
         // We check the recorded transaction in both vaults.
         for (node in listOf(alice, bob)) {
-            val recordedTx = node.services.validatedTransactions.getTransaction(tx.id)!!
+            assertNull(txPair.first)
+            val recordedTx = node.services.validatedTransactions.getTransaction(txPair.second.id)!!
             val txInputs = recordedTx.tx.inputs
             assertEquals(3, txInputs.size)
             assertEquals(expected0, node.services.toStateAndRef<TokenStateK>(txInputs[0]).state.data)
@@ -340,6 +342,49 @@ class RedeemFlowsTestsK {
         val future = bob.startFlow(flow)
         network.runNetwork()
         assertFailsWith<FlowException> { future.getOrThrow() }
+    }
+
+    @Test
+    fun `SimpleInitiator splits to get exact amount`() {
+        val expected0 = createFrom(alice, bob, 10L)
+        val expected1 = createFrom(alice, bob, 20L)
+        val expected2 = createFrom(alice, bob, 5L)
+        val expected3 = createFrom(alice, bob, 32L)
+        val expected4 = createFrom(alice, bob, 3L)
+        val tokens = alice.issueTokens(network, listOf(
+                NodeHolding(bob, 10L),
+                NodeHolding(bob, 20L),
+                NodeHolding(bob, 5L)))
+
+        val flow = RedeemFlowsK.SimpleInitiator(
+                tokens[0].state.notary,
+                alice.info.singleIdentity(),
+                bob.info.singleIdentity(),
+                32L)
+        val future = bob.startFlow(flow)
+        network.runNetwork()
+        val txPair = future.getOrThrow()
+
+        // We check the move recorded transaction in bob's vault.
+        val moveTx = bob.services.validatedTransactions.getTransaction(txPair.first!!.id)!!
+        val moveTxInputs = moveTx.tx.inputs
+        assertEquals(3, moveTxInputs.size)
+        assertEquals(expected0, bob.services.toStateAndRef<TokenStateK>(moveTxInputs[0]).state.data)
+        assertEquals(expected1, bob.services.toStateAndRef<TokenStateK>(moveTxInputs[1]).state.data)
+        assertEquals(expected2, bob.services.toStateAndRef<TokenStateK>(moveTxInputs[2]).state.data)
+        val txOutputs = moveTx.tx.outputs
+        assertEquals(2, txOutputs.size)
+        assertEquals(expected3, txOutputs[0].data)
+        assertEquals(expected4, txOutputs[1].data)
+
+        // We check the redeem recorded transaction in both vaults.
+        for (node in listOf(alice, bob)) {
+            val recordedTx = node.services.validatedTransactions.getTransaction(txPair.second.id)!!
+            val txInputs = recordedTx.tx.inputs
+            assertEquals(1, txInputs.size)
+            assertEquals(expected3, node.services.toStateAndRef<TokenStateK>(txInputs[0]).state.data)
+            assertTrue(recordedTx.tx.outputs.isEmpty())
+        }
     }
 
 }
