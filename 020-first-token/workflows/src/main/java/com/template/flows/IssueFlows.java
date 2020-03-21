@@ -54,8 +54,7 @@ public interface IssueFlows {
                     GENERATING_TRANSACTION,
                     VERIFYING_TRANSACTION,
                     SIGNING_TRANSACTION,
-                    FINALISING_TRANSACTION
-            );
+                    FINALISING_TRANSACTION);
         }
 
         /**

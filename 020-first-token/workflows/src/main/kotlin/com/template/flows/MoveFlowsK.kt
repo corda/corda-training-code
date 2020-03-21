@@ -169,7 +169,6 @@ object MoveFlowsK {
                                         .inputsOfType<TokenStateK>()
                                         .any { it.holder == ourIdentity }
                                 "I must be relevant." using relevant
-                                // We add our internal check for clients that want to extend this feature.
                             }
                         }
                     }

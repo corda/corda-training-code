@@ -18,7 +18,6 @@ import net.corda.core.transactions.TransactionBuilder;
 import net.corda.core.utilities.ProgressTracker;
 import net.corda.core.utilities.ProgressTracker.Step;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.security.SignatureException;
 import java.util.ArrayList;
@@ -71,8 +70,7 @@ public interface RedeemFlows {
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,
                     VERIFYING_TRANSACTION,
-                    FINALISING_TRANSACTION
-            );
+                    FINALISING_TRANSACTION);
         }
 
         // By requiring an exact list of states, this flow assures absolute precision at the expense of
@@ -192,8 +190,7 @@ public interface RedeemFlows {
         public static ProgressTracker tracker() {
             return new ProgressTracker(
                     SIGNING_TRANSACTION,
-                    FINALISING_TRANSACTION
-            );
+                    FINALISING_TRANSACTION);
         }
 
         public Responder(@NotNull final FlowSession counterpartySession) {
