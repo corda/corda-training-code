@@ -4,9 +4,12 @@ import com.google.common.collect.ImmutableList;
 import com.template.flows.RedeemFlows.Initiator;
 import com.template.flows.RedeemFlows.SimpleInitiator;
 import com.template.states.TokenState;
+import javafx.util.Pair;
 import net.corda.core.concurrent.CordaFuture;
+import net.corda.core.contracts.ContractState;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.contracts.StateRef;
+import net.corda.core.contracts.TransactionState;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowSession;
 import net.corda.core.flows.InitiatedBy;
@@ -314,13 +317,13 @@ public class RedeemFlowsTests {
                 alice.getInfo().getLegalIdentities().get(0),
                 bob.getInfo().getLegalIdentities().get(0),
                 30L);
-        final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
+        final CordaFuture<Pair<SignedTransaction, SignedTransaction>> future = bob.startFlow(flow);
         network.runNetwork();
 
-        final SignedTransaction tx = future.get();
+        final Pair<SignedTransaction, SignedTransaction> txPair = future.get();
         // We check the recorded transaction in both vaults.
         for (StartedMockNode node : Arrays.asList(alice, bob)) {
-            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
+            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(txPair.getValue().getId());
             @SuppressWarnings("ConstantConditions") final List<StateRef> txInputs = recordedTx.getTx().getInputs();
             assertEquals(2, txInputs.size());
             assertEquals(expected0, node.getServices().toStateAndRef(txInputs.get(0)).getState().getData());
@@ -344,13 +347,13 @@ public class RedeemFlowsTests {
                 alice.getInfo().getLegalIdentities().get(0),
                 bob.getInfo().getLegalIdentities().get(0),
                 35L);
-        final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
+        final CordaFuture<Pair<SignedTransaction, SignedTransaction>> future = bob.startFlow(flow);
         network.runNetwork();
 
-        final SignedTransaction tx = future.get();
+        final Pair<SignedTransaction, SignedTransaction> txPair = future.get();
         // We check the recorded transaction in both vaults.
         for (StartedMockNode node : Arrays.asList(alice, bob)) {
-            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
+            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(txPair.getValue().getId());
             @SuppressWarnings("ConstantConditions") final List<StateRef> txInputs = recordedTx.getTx().getInputs();
             assertEquals(3, txInputs.size());
             assertEquals(expected0, node.getServices().toStateAndRef(txInputs.get(0)).getState().getData());
@@ -371,12 +374,58 @@ public class RedeemFlowsTests {
                 alice.getInfo().getLegalIdentities().get(0),
                 bob.getInfo().getLegalIdentities().get(0),
                 35L);
-        final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
+        final CordaFuture<Pair<SignedTransaction, SignedTransaction>> future = bob.startFlow(flow);
         network.runNetwork();
         try {
             future.get();
         } catch (ExecutionException ex) {
             throw ex.getCause();
+        }
+    }
+
+
+    @Test
+    public void SimpleInitiatorSplitsToGetExactAmount() throws Throwable {
+        final TokenState expected0 = createFrom(alice, bob, 10L);
+        final TokenState expected1 = createFrom(alice, bob, 20L);
+        final TokenState expected2 = createFrom(alice, bob, 5L);
+        final TokenState expected3 = createFrom(alice, bob, 32L);
+        final TokenState expected4 = createFrom(alice, bob, 3L);
+        final List<StateAndRef<TokenState>> tokens = issueTokens(alice, network, Arrays.asList(
+                new FlowHelpers.NodeHolding(bob, 10L),
+                new FlowHelpers.NodeHolding(bob, 20L),
+                new FlowHelpers.NodeHolding(bob, 5L)));
+
+        final SimpleInitiator flow = new SimpleInitiator(
+                tokens.get(0).getState().getNotary(),
+                alice.getInfo().getLegalIdentities().get(0),
+                bob.getInfo().getLegalIdentities().get(0),
+                32L);
+        final CordaFuture<Pair<SignedTransaction, SignedTransaction>> future = bob.startFlow(flow);
+        network.runNetwork();
+        final Pair<SignedTransaction, SignedTransaction> txPair = future.get();
+
+        // We check the move recorded transaction in bob's vault.
+        final SignedTransaction moveTx = bob.getServices().getValidatedTransactions().getTransaction(txPair.getKey().getId());
+        @SuppressWarnings("ConstantConditions")
+        final List<StateRef> moveTxInputs = moveTx.getTx().getInputs();
+        assertEquals(3, moveTxInputs.size());
+        assertEquals(expected0, bob.getServices().toStateAndRef(moveTxInputs.get(0)).getState().getData());
+        assertEquals(expected1, bob.getServices().toStateAndRef(moveTxInputs.get(1)).getState().getData());
+        assertEquals(expected2, bob.getServices().toStateAndRef(moveTxInputs.get(2)).getState().getData());
+        final List<TransactionState<ContractState>> txOutputs = moveTx.getTx().getOutputs();
+        assertEquals(2, txOutputs.size());
+        assertEquals(expected3, txOutputs.get(0).getData());
+        assertEquals(expected4, txOutputs.get(1).getData());
+
+        // We check the redeem recorded transaction in both vaults.
+        for (StartedMockNode node : Arrays.asList(alice, bob)) {
+            final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(txPair.getValue().getId());
+            @SuppressWarnings("ConstantConditions")
+            final List<StateRef> txInputs = recordedTx.getTx().getInputs();
+            assertEquals(1, txInputs.size());
+            assertEquals(expected3, node.getServices().toStateAndRef(txInputs.get(0)).getState().getData());
+            assertTrue(recordedTx.getTx().getOutputs().isEmpty());
         }
     }
 

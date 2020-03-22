@@ -3,6 +3,7 @@ package com.template.flows;
 import co.paralleluniverse.fibers.Suspendable;
 import com.google.common.collect.ImmutableList;
 import com.template.states.TokenState;
+import javafx.util.Pair;
 import net.corda.core.contracts.AttachmentResolutionException;
 import net.corda.core.contracts.Command;
 import net.corda.core.contracts.StateAndRef;
@@ -20,10 +21,7 @@ import net.corda.core.utilities.ProgressTracker.Step;
 import org.jetbrains.annotations.NotNull;
 
 import java.security.SignatureException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -316,7 +314,7 @@ public interface RedeemFlows {
      * Allows to redeem a specific quantity of fungible tokens, as it assists in fetching them in the vault.
      */
     @StartableByRPC
-    class SimpleInitiator extends FlowLogic<SignedTransaction> {
+    class SimpleInitiator extends FlowLogic<Pair<SignedTransaction, SignedTransaction>> {
         @NotNull
         private final Party issuer;
         private final long totalQuantity;
@@ -413,18 +411,30 @@ public interface RedeemFlows {
 
         @Suspendable
         @Override
-        public SignedTransaction call() throws FlowException {
+        public Pair<SignedTransaction, SignedTransaction> call() throws FlowException {
             progressTracker.setCurrentStep(FETCHING_TOKEN_STATES);
             final StateAccumulator accumulated = fetchWorthAtLeast(totalQuantity);
 
             progressTracker.setCurrentStep(MOVING_TO_EXACT_COUNT);
-            // TODO handle a Move so as to have the exact amount to pass next instead of potentially redeeming more
-            // than intended.
+            // If we did not get an exact amount, we need to create some change for ourselves before we redeem the
+            // exact quantity wanted.
+            final SignedTransaction moveTx = accumulated.sum <= totalQuantity ? null :
+                    subFlow(new MoveFlows.Initiator(accumulated.states, Arrays.asList(
+                    new TokenState(issuer, getOurIdentity(), totalQuantity), // Index 0 in outputs.
+                    new TokenState(issuer, getOurIdentity(), accumulated.sum - totalQuantity))));
+
+            final List<StateAndRef<TokenState>> toUse;
+            try {
+                toUse = moveTx == null ? accumulated.states :
+                        Collections.singletonList(moveTx.toLedgerTransaction(getServiceHub()).outRef(0));
+            } catch (SignatureException ex) {
+                throw new FlowException(ex);
+            }
 
             progressTracker.setCurrentStep(HANDING_TO_INITIATOR);
-            return subFlow(new Initiator(
-                    accumulated.states,
-                    HANDING_TO_INITIATOR.childProgressTracker()));
+            return new Pair<>(moveTx, subFlow(new Initiator(
+                    toUse,
+                    HANDING_TO_INITIATOR.childProgressTracker())));
         }
 
     }

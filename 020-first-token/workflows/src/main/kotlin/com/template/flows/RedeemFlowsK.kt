@@ -279,11 +279,11 @@ object RedeemFlowsK {
             // exact quantity wanted.
             val moveTx = if (accumulated.sum <= totalQuantity) null
             else subFlow(MoveFlowsK.Initiator(accumulated.states, listOf(
-                    TokenStateK(issuer, ourIdentity, totalQuantity),
+                    TokenStateK(issuer, ourIdentity, totalQuantity), // Index 0 in outputs.
                     TokenStateK(issuer, ourIdentity, accumulated.sum - totalQuantity))))
 
             val toUse = if (moveTx == null) accumulated.states
-            else listOf(moveTx.toLedgerTransaction(serviceHub).outRefsOfType<TokenStateK>().get(0))
+            else listOf(moveTx.toLedgerTransaction(serviceHub).outRef(0))
 
             progressTracker.currentStep = HANDING_TO_INITIATOR
             return Pair(moveTx, subFlow(Initiator(
