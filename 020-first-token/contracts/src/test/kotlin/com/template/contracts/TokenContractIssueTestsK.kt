@@ -12,19 +12,19 @@ import org.junit.Test
 
 class TokenContractIssueTestsK {
     private val ledgerServices = MockServices()
-    private val alice = TestIdentity(CordaX500Name("Alice", "London", "GB"))
-    private val bob = TestIdentity(CordaX500Name("Bob", "New York", "US"))
-    private val carly = TestIdentity(CordaX500Name("Carly", "New York", "US"))
+    private val alice = TestIdentity(CordaX500Name("Alice", "London", "GB")).party
+    private val bob = TestIdentity(CordaX500Name("Bob", "New York", "US")).party
+    private val carly = TestIdentity(CordaX500Name("Carly", "New York", "US")).party
 
     @Test
     fun `transaction must include a TokenContract command`() {
         ledgerServices.ledger {
             transaction {
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
                 // Let's add a command from an unrelated dummy contract.
-                command(alice.publicKey, DummyContract.Commands.Create())
+                command(alice.owningKey, DummyContract.Commands.Create())
                 `fails with`("Required com.template.contracts.TokenContractK.Commands command")
-                command(alice.publicKey, TokenContractK.Commands.Issue())
+                command(alice.owningKey, TokenContractK.Commands.Issue())
                 verifies()
             }
         }
@@ -34,9 +34,9 @@ class TokenContractIssueTestsK {
     fun `Issue transaction must have no inputs`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 10L))
-                command(alice.publicKey, TokenContractK.Commands.Issue())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 10L))
+                command(alice.owningKey, TokenContractK.Commands.Issue())
                 `fails with`("No tokens should be consumed when issuing.")
             }
         }
@@ -47,7 +47,7 @@ class TokenContractIssueTestsK {
         ledgerServices.ledger {
             transaction {
                 output(TOKEN_CONTRACT_ID, DummyState())
-                command(alice.publicKey, TokenContractK.Commands.Issue())
+                command(alice.owningKey, TokenContractK.Commands.Issue())
                 `fails with`("There should be issued tokens.")
             }
         }
@@ -57,9 +57,9 @@ class TokenContractIssueTestsK {
     fun `Outputs must not have a zero quantity`() {
         ledgerServices.ledger {
             transaction {
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 0L))
-                command(alice.publicKey, TokenContractK.Commands.Issue())
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 0L))
+                command(alice.owningKey, TokenContractK.Commands.Issue())
                 `fails with`("All quantities must be above 0.")
             }
         }
@@ -69,9 +69,9 @@ class TokenContractIssueTestsK {
     fun `Outputs must not have negative quantity`() {
         ledgerServices.ledger {
             transaction {
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, -1L))
-                command(alice.publicKey, TokenContractK.Commands.Issue())
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, -1L))
+                command(alice.owningKey, TokenContractK.Commands.Issue())
                 `fails with`("All quantities must be above 0.")
             }
         }
@@ -81,8 +81,8 @@ class TokenContractIssueTestsK {
     fun `Issuer must sign Issue transaction`() {
         ledgerServices.ledger {
             transaction {
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                command(bob.publicKey, TokenContractK.Commands.Issue())
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                command(bob.owningKey, TokenContractK.Commands.Issue())
                 `fails with`("The issuers should sign.")
             }
         }
@@ -92,9 +92,9 @@ class TokenContractIssueTestsK {
     fun `All issuers must sign Issue transaction`() {
         ledgerServices.ledger {
             transaction {
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 20L))
-                command(alice.publicKey, TokenContractK.Commands.Issue())
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 20L))
+                command(alice.owningKey, TokenContractK.Commands.Issue())
                 `fails with`("The issuers should sign.")
             }
         }
@@ -104,12 +104,12 @@ class TokenContractIssueTestsK {
     fun `Can have different issuers in Issue transaction`() {
         ledgerServices.ledger {
             transaction {
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, alice.party, 20L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 30L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 20L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(carly.party, alice.party, 20L))
-                command(listOf(alice.publicKey, carly.publicKey), TokenContractK.Commands.Issue())
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, alice, 20L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 30L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 20L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(carly, alice, 20L))
+                command(listOf(alice.owningKey, carly.owningKey), TokenContractK.Commands.Issue())
                 verifies()
             }
         }

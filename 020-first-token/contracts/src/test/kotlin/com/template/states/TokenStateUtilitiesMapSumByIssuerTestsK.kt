@@ -4,12 +4,19 @@ import net.corda.core.identity.CordaX500Name
 import net.corda.testing.core.TestIdentity
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class TokenStateUtilitiesMapSumByIssuerTestsK {
 
     private val alice = TestIdentity(CordaX500Name("Alice", "London", "GB")).party
     private val bob = TestIdentity(CordaX500Name("Bob", "London", "GB")).party
     private val carly = TestIdentity(CordaX500Name("Carly", "London", "GB")).party
+
+    @Test
+    fun `mapSumByIssuer returns empty on empty`() {
+        val mappedSums = listOf<TokenStateK>().mapSumByIssuer()
+        assertTrue(mappedSums.isEmpty())
+    }
 
     @Test
     fun `mapSumByIssuer gets same value on singleton`() {
