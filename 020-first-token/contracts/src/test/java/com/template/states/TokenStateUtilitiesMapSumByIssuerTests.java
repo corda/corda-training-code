@@ -10,12 +10,19 @@ import java.util.*;
 
 import static com.template.states.TokenStateUtilities.mapSumByIssuer;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TokenStateUtilitiesMapSumByIssuerTests {
 
     private final Party alice = new TestIdentity(new CordaX500Name("Alice", "London", "GB")).getParty();
     private final Party bob = new TestIdentity(new CordaX500Name("Bob", "London", "GB")).getParty();
     private final Party carly = new TestIdentity(new CordaX500Name("Carly", "London", "GB")).getParty();
+
+    @Test
+    public void mapSumByIssuerReturnsEmptyOnEmpty() {
+        final Map<Party, Long> mappedSums = mapSumByIssuer(Collections.emptyList());
+        assertTrue(mappedSums.isEmpty());
+    }
 
     @Test
     public void mapSumByIssuerGetsSameValueOnSingleton() {

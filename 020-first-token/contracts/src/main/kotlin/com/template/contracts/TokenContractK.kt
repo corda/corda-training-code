@@ -21,6 +21,7 @@ class TokenContractK : Contract {
         val inputs = tx.inputsOfType<TokenStateK>()
         val outputs = tx.outputsOfType<TokenStateK>()
         val hasAllPositiveQuantities = inputs.all { 0 < it.quantity } && outputs.all { 0 < it.quantity }
+        val allInputHolderKeys = inputs.map { it.holder.owningKey }.distinct()
 
         when (command.value) {
             is Commands.Issue -> requireThat {
@@ -49,7 +50,7 @@ class TokenContractK : Contract {
                 "The sum of quantities for each issuer should be conserved." using inputSums.all { outputSums[it.key] == it.value }
 
                 // Constraints on the signers.
-                "The current holders should sign." using command.signers.containsAll(inputs.map { it.holder.owningKey }.distinct())
+                "The current holders should sign." using command.signers.containsAll(allInputHolderKeys)
             }
 
             is Commands.Redeem -> requireThat {
@@ -62,7 +63,7 @@ class TokenContractK : Contract {
 
                 // Constraints on the signers.
                 "The issuers should sign." using command.signers.containsAll(inputs.map { it.issuer.owningKey }.distinct())
-                "The current holders should sign." using command.signers.containsAll(inputs.map { it.holder.owningKey }.distinct())
+                "The current holders should sign." using command.signers.containsAll(allInputHolderKeys)
             }
 
             else -> throw IllegalArgumentException("Unknown command ${command.value}.")

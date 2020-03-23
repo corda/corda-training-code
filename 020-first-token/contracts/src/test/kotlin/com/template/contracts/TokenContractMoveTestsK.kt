@@ -5,7 +5,6 @@ import com.template.states.TokenStateK
 import net.corda.core.contracts.TransactionVerificationException
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.contracts.DummyContract
-import net.corda.testing.contracts.DummyState
 import net.corda.testing.core.TestIdentity
 import net.corda.testing.node.MockServices
 import net.corda.testing.node.ledger
@@ -14,19 +13,19 @@ import kotlin.test.assertEquals
 
 class TokenContractMoveTestsK {
     private val ledgerServices = MockServices()
-    private val alice = TestIdentity(CordaX500Name("Alice", "London", "GB"))
-    private val bob = TestIdentity(CordaX500Name("Bob", "New York", "US"))
-    private val carly = TestIdentity(CordaX500Name("Carly", "New York", "US"))
+    private val alice = TestIdentity(CordaX500Name("Alice", "London", "GB")).party
+    private val bob = TestIdentity(CordaX500Name("Bob", "New York", "US")).party
+    private val carly = TestIdentity(CordaX500Name("Carly", "New York", "US")).party
 
     @Test
     fun `Transaction must include a TokenContract command`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 10L))
-                command(alice.publicKey, DummyContract.Commands.Create())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 10L))
+                command(alice.owningKey, DummyContract.Commands.Create())
                 `fails with`("Required com.template.contracts.TokenContractK.Commands command")
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 verifies()
             }
         }
@@ -36,8 +35,8 @@ class TokenContractMoveTestsK {
     fun `Move transaction must have inputs`() {
         ledgerServices.ledger {
             transaction {
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 10L))
-                command(alice.publicKey, TokenContractK.Commands.Move())
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 10L))
+                command(alice.owningKey, TokenContractK.Commands.Move())
                 `fails with`("There should be tokens to move.")
             }
         }
@@ -47,8 +46,8 @@ class TokenContractMoveTestsK {
     fun `Move transaction must have outputs`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("There should be moved tokens.")
             }
         }
@@ -60,10 +59,10 @@ class TokenContractMoveTestsK {
     fun `Inputs must not have a zero quantity`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 0L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 0L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("All quantities must be above 0.")
             }
         }
@@ -75,10 +74,10 @@ class TokenContractMoveTestsK {
     fun `Inputs must not have negative quantity`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, -1L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 9L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, -1L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 9L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("All quantities must be above 0.")
             }
         }
@@ -88,10 +87,10 @@ class TokenContractMoveTestsK {
     fun `Outputs must not have a zero quantity`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 0L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 0L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("All quantities must be above 0.")
             }
         }
@@ -101,10 +100,10 @@ class TokenContractMoveTestsK {
     fun `Outputs must not have negative quantity`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 11L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, -1L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 11L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, -1L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("All quantities must be above 0.")
             }
         }
@@ -114,9 +113,9 @@ class TokenContractMoveTestsK {
     fun `Issuer must be conserved in Move transaction`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 10L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 10L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("Consumed and created issuers should be identical.")
             }
         }
@@ -126,10 +125,10 @@ class TokenContractMoveTestsK {
     fun `All issuers must be conserved in Move transaction`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 20L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 20L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("Consumed and created issuers should be identical.")
             }
         }
@@ -139,10 +138,10 @@ class TokenContractMoveTestsK {
     fun `Sum must be conserved in Move transaction`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 15L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 20L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 15L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 20L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("The sum of quantities for each issuer should be conserved.")
             }
         }
@@ -152,13 +151,13 @@ class TokenContractMoveTestsK {
     fun `All sums per issuer must be conserved in Move transaction`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 15L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 20L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 10L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 15L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 30L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 15L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 20L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 15L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 30L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("The sum of quantities for each issuer should be conserved.")
             }
         }
@@ -169,16 +168,16 @@ class TokenContractMoveTestsK {
         try {
             ledgerServices.ledger {
                 transaction {
-                    input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, Long.MAX_VALUE))
-                    input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 1L))
-                    output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 1L))
-                    output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, Long.MAX_VALUE))
-                    command(listOf(bob.publicKey, carly.publicKey), TokenContractK.Commands.Move())
+                    input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, Long.MAX_VALUE))
+                    input(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 1L))
+                    output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 1L))
+                    output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, Long.MAX_VALUE))
+                    command(listOf(bob.owningKey, carly.owningKey), TokenContractK.Commands.Move())
                     verifies()
                 }
             }
             throw NotImplementedError("Should not reach here")
-        } catch(e: TransactionVerificationException.ContractRejection) {
+        } catch (e: TransactionVerificationException.ContractRejection) {
             assertEquals(ArithmeticException::class, e.cause!!::class)
         }
     }
@@ -187,9 +186,9 @@ class TokenContractMoveTestsK {
     fun `Current holder must sign Move transaction`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 10L))
-                command(alice.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 10L))
+                command(alice.owningKey, TokenContractK.Commands.Move())
                 `fails with`("The current holders should sign.")
             }
         }
@@ -199,10 +198,10 @@ class TokenContractMoveTestsK {
     fun `All current holders must sign Move transaction`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 20L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 30L))
-                command(bob.publicKey, TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 20L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 30L))
+                command(bob.owningKey, TokenContractK.Commands.Move())
                 `fails with`("The current holders should sign.")
             }
         }
@@ -212,15 +211,15 @@ class TokenContractMoveTestsK {
     fun `Can have different issuers in Move transaction`() {
         ledgerServices.ledger {
             transaction {
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 10L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 20L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, alice.party, 5L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, bob.party, 5L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(alice.party, carly.party, 20L))
-                input(TOKEN_CONTRACT_ID, TokenStateK(carly.party, carly.party, 40L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(carly.party, alice.party, 20L))
-                output(TOKEN_CONTRACT_ID, TokenStateK(carly.party, bob.party, 20L))
-                command(listOf(bob.publicKey, carly.publicKey), TokenContractK.Commands.Move())
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 20L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, alice, 5L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 5L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 20L))
+                input(TOKEN_CONTRACT_ID, TokenStateK(carly, carly, 40L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(carly, alice, 20L))
+                output(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 20L))
+                command(listOf(bob.owningKey, carly.owningKey), TokenContractK.Commands.Move())
                 verifies()
             }
         }

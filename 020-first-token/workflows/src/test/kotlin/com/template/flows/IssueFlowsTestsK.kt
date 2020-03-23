@@ -43,8 +43,8 @@ class IssueFlowsTestsK {
         val future = alice.startFlow(flow)
         network.runNetwork()
 
-        val signedTx = future.getOrThrow()
-        signedTx.verifyRequiredSignatures()
+        val tx = future.getOrThrow()
+        tx.verifyRequiredSignatures()
     }
 
     @Test
@@ -52,14 +52,14 @@ class IssueFlowsTestsK {
         val flow = IssueFlowsK.Initiator(bob.info.singleIdentity(), 10L)
         val future = alice.startFlow(flow)
         network.runNetwork()
-        val signedTx = future.getOrThrow()
+        val tx = future.getOrThrow()
 
         // We check the recorded transaction in both transaction storages.
         for (node in listOf(alice, bob)) {
-            assertEquals(signedTx, node.services.validatedTransactions.getTransaction(signedTx.id))
+            assertEquals(tx, node.services.validatedTransactions.getTransaction(tx.id))
         }
         for (node in listOf(carly, dan)) {
-            assertNull(node.services.validatedTransactions.getTransaction(signedTx.id))
+            assertNull(node.services.validatedTransactions.getTransaction(tx.id))
         }
     }
 
@@ -70,13 +70,13 @@ class IssueFlowsTestsK {
                 Pair(carly.info.singleIdentity(), 20L)))
         val future = alice.startFlow(flow)
         network.runNetwork()
-        val signedTx = future.getOrThrow()
+        val tx = future.getOrThrow()
 
         // We check the recorded transaction in transaction storages.
         for (node in listOf(alice, bob, carly)) {
-            assertEquals(signedTx, node.services.validatedTransactions.getTransaction(signedTx.id))
+            assertEquals(tx, node.services.validatedTransactions.getTransaction(tx.id))
         }
-        assertNull(dan.services.validatedTransactions.getTransaction(signedTx.id))
+        assertNull(dan.services.validatedTransactions.getTransaction(tx.id))
     }
 
     @Test
@@ -86,11 +86,11 @@ class IssueFlowsTestsK {
         val flow = IssueFlowsK.Initiator(expected.holder, expected.quantity)
         val future = alice.startFlow(flow)
         network.runNetwork()
-        val signedTx = future.getOrThrow()
+        val tx = future.getOrThrow()
 
         // We check the recorded transaction in both vaults.
         for (node in listOf(alice, bob)) {
-            val recordedTx = node.services.validatedTransactions.getTransaction(signedTx.id)!!
+            val recordedTx = node.services.validatedTransactions.getTransaction(tx.id)!!
             assertTrue(recordedTx.tx.inputs.isEmpty())
             val txOutputs = recordedTx.tx.outputs
             assertEquals(1, txOutputs.size)
@@ -121,11 +121,11 @@ class IssueFlowsTestsK {
                 expected2.toPair()))
         val future = alice.startFlow(flow)
         network.runNetwork()
-        val signedTx = future.getOrThrow()
+        val tx = future.getOrThrow()
 
         // We check the recorded transaction in the 3 vaults.
         for (node in listOf(alice, bob, carly)) {
-            val recordedTx = node.services.validatedTransactions.getTransaction(signedTx.id)!!
+            val recordedTx = node.services.validatedTransactions.getTransaction(tx.id)!!
             assertTrue(recordedTx.tx.inputs.isEmpty())
             val txOutputs = recordedTx.tx.outputs
             assertEquals(2, txOutputs.size)
@@ -164,11 +164,11 @@ class IssueFlowsTestsK {
                 expected2.toPair()))
         val future = alice.startFlow(flow)
         network.runNetwork()
-        val signedTx = future.getOrThrow()
+        val tx = future.getOrThrow()
 
         // We check the recorded transaction in both vaults.
         for (node in listOf(alice, bob)) {
-            val recordedTx = node.services.validatedTransactions.getTransaction(signedTx.id)!!
+            val recordedTx = node.services.validatedTransactions.getTransaction(tx.id)!!
             assertTrue(recordedTx.tx.inputs.isEmpty())
             val txOutputs = recordedTx.tx.outputs
             assertEquals(2, txOutputs.size)
