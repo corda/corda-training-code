@@ -2,6 +2,7 @@ package com.template.states;
 
 import com.google.common.collect.ImmutableMap;
 import net.corda.core.identity.Party;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Map;
@@ -9,7 +10,11 @@ import java.util.stream.Collectors;
 
 public interface TokenStateUtilities {
 
-    static Map<Party, Long> mapSumByIssuer(final Collection<TokenState> states) {
+    /**
+     * @param states The states to tally.
+     * @return The mapped sums of token quantities per issuer.
+     */
+    static Map<Party, Long> mapSumByIssuer(@NotNull final Collection<TokenState> states) {
         // Thanks to the Stream, we are able to return our List in one go, instead of creating a modifiable Map
         // and then conditionally putting elements to it with for... put.
         return ImmutableMap.copyOf(states.stream()

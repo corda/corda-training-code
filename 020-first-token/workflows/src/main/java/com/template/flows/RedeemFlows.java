@@ -118,7 +118,7 @@ public interface RedeemFlows {
                     .collect(Collectors.toList());
 
             // The issuers and holders are required signers, so we express this here.
-            List<Party> allSigners = new ArrayList<>(otherSigners);
+            final List<Party> allSigners = new ArrayList<>(otherSigners);
             allSigners.add(getOurIdentity());
             final Command<Redeem> txCommand = new Command<>(
                     new Redeem(),

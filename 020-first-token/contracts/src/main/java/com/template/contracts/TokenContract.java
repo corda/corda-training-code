@@ -9,8 +9,10 @@ import net.corda.core.identity.Party;
 import net.corda.core.transactions.LedgerTransaction;
 import org.jetbrains.annotations.NotNull;
 
+import java.security.PublicKey;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static net.corda.core.contracts.ContractsDSL.requireSingleCommand;
@@ -30,6 +32,9 @@ public class TokenContract implements Contract {
         final boolean hasAllPositiveQuantities =
                 inputs.stream().allMatch(it -> 0 < it.getQuantity()) &&
                         outputs.stream().allMatch(it -> 0 < it.getQuantity());
+        final Set<PublicKey> allInputHolderKeys = inputs.stream()
+                .map(it -> it.getHolder().getOwningKey())
+                .collect(Collectors.toSet());
 
         if (command.getValue() instanceof Commands.Issue) {
             requireThat(req -> {
@@ -60,20 +65,15 @@ public class TokenContract implements Contract {
                 req.using("All quantities must be above 0.", hasAllPositiveQuantities);
                 final Map<Party, Long> inputSums = TokenStateUtilities.mapSumByIssuer(inputs);
                 final Map<Party, Long> outputSums = TokenStateUtilities.mapSumByIssuer(outputs);
-                req.using(
-                        "Consumed and created issuers should be identical.",
+                req.using("Consumed and created issuers should be identical.",
                         inputSums.keySet().equals(outputSums.keySet()));
-                req.using(
-                        "The sum of quantities for each issuer should be conserved.",
+                req.using("The sum of quantities for each issuer should be conserved.",
                         inputSums.entrySet().stream()
                                 .allMatch(entry -> outputSums.get(entry.getKey()).equals(entry.getValue())));
 
                 // Constraints on the signers.
                 req.using("The current holders should sign.",
-                        command.getSigners().containsAll(inputs.stream()
-                                .map(it -> it.getHolder().getOwningKey())
-                                .collect(Collectors.toSet())
-                        ));
+                        command.getSigners().containsAll(allInputHolderKeys));
 
                 return null;
             });
@@ -93,10 +93,7 @@ public class TokenContract implements Contract {
                                 .collect(Collectors.toSet())
                         ));
                 req.using("The current holders should sign.",
-                        command.getSigners().containsAll(inputs.stream()
-                                .map(it -> it.getHolder().getOwningKey())
-                                .collect(Collectors.toSet())
-                        ));
+                        command.getSigners().containsAll(allInputHolderKeys));
 
                 return null;
             });

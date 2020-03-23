@@ -6,7 +6,6 @@ import com.template.contracts.TokenContractK.Commands.Move
 import com.template.states.TokenStateK
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndRef
-import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
@@ -18,6 +17,7 @@ object MoveFlowsK {
 
     @CordaSerializable
     /**
+     * The different transaction roles expected of the responder.
      * A participant needs to sign, an observer only needs to receive the result.
      */
     enum class TransactionRole { PARTICIPANT, OBSERVER }
@@ -73,7 +73,7 @@ object MoveFlowsK {
                     // Remove duplicates as it would be an issue when initiating flows, at least.
                     .distinct()
                     // We don't want to sign transactions where our signature is not needed.
-                    .also { require(it.contains(ourIdentity)) { "I must be a holder." } }
+                    .also { if (!it.contains(ourIdentity)) throw FlowException("I must be a holder.") }
                     // Remove myself.
                     .minus(ourIdentity)
 
@@ -161,15 +161,13 @@ object MoveFlowsK {
                 TransactionRole.PARTICIPANT -> {
                     val signTransactionFlow = object : SignTransactionFlow(counterpartySession) {
                         override fun checkTransaction(stx: SignedTransaction) {
-                            requireThat {
-                                // Notice that there is still a security risk here as my node can be asked to sign
-                                // without my human knowledge.
-                                // I must be relevant. We don't like signing irrelevant transactions.
-                                val relevant = stx.toLedgerTransaction(serviceHub, false)
-                                        .inputsOfType<TokenStateK>()
-                                        .any { it.holder == ourIdentity }
-                                "I must be relevant." using relevant
-                            }
+                            // Notice that there is still a security risk here as my node can be asked to sign
+                            // without my human knowledge.
+                            // I must be relevant. We don't like signing irrelevant transactions.
+                            val relevant = stx.toLedgerTransaction(serviceHub, false)
+                                    .inputsOfType<TokenStateK>()
+                                    .any { it.holder == ourIdentity }
+                            if (!relevant) throw FlowException("I must be relevant.")
                         }
                     }
                     subFlow(signTransactionFlow).id

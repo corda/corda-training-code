@@ -26,21 +26,21 @@ import java.util.stream.Collectors;
 
 import static com.template.flows.MoveFlows.TransactionRole.OBSERVER;
 import static com.template.flows.MoveFlows.TransactionRole.PARTICIPANT;
-import static net.corda.core.contracts.ContractsDSL.requireThat;
 
 public interface MoveFlows {
 
     /**
+     * The different transaction roles expected of the responder.
      * A participant needs to sign, an observer only needs to receive the result.
      */
     @CordaSerializable
     enum TransactionRole {PARTICIPANT, OBSERVER}
 
     /**
-     * Started by a [TokenStateK.holder] to move multiple states where it is one of the holders.
-     * Because it is an [InitiatingFlow], its counterpart flow [Responder] is called automatically.
-     * This constructor would be called by RPC or by [FlowLogic.subFlow]. In particular one that, given sums, fetches
-     * states in the vault.
+     * Started by a {@link TokenState#getHolder} to move multiple states where it is one of the holders.
+     * Because it is an {@link InitiatingFlow}, its counterpart flow {@link Responder} is called automatically.
+     * This constructor would be called by RPC or by {@link FlowLogic#subFlow}. In particular one that, given sums,
+     * fetches states in the vault.
      */
     @InitiatingFlow
     @StartableByRPC
@@ -102,8 +102,7 @@ public interface MoveFlows {
         public SignedTransaction call() throws FlowException {
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
             // We can only make a transaction if all states have to be marked by the same notary.
-            final Set<Party> notaries = inputTokens
-                    .stream()
+            final Set<Party> notaries = inputTokens.stream()
                     .map(it -> it.getState().getNotary())
                     .collect(Collectors.toSet());
             if (notaries.size() != 1) {
@@ -111,8 +110,7 @@ public interface MoveFlows {
             }
             final Party notary = notaries.iterator().next();
 
-            final Set<Party> allSigners = inputTokens
-                    .stream()
+            final Set<Party> allSigners = inputTokens.stream()
                     // Only the input holder is necessary on a Move.
                     .map(it -> it.getState().getData().getHolder())
                     // Remove duplicates as it would be an issue when initiating flows, at least.
@@ -136,14 +134,15 @@ public interface MoveFlows {
 
             progressTracker.setCurrentStep(GATHERING_SIGS);
             // We need to gather the signatures of all issuers and all holders, except ourselves.
-            final List<FlowSession> signerFlows = allSigners
-                    .stream()
+            final List<FlowSession> signerFlows = allSigners.stream()
                     // We don't need to inform ourselves and we signed already.
                     .filter(it -> !it.equals(getOurIdentity()))
                     .map(this::initiateFlow)
                     .collect(Collectors.toList());
             // Prime these responders to act in a signer type of way.
-            for (FlowSession it : signerFlows) {
+            // We need to use `for` instead of `.forEach` because we would need to annotate the lambda with
+            // @Suspendable.
+            for (final FlowSession it : signerFlows) {
                 it.send(PARTICIPANT);
             }
             final SignedTransaction fullySignedTx = signerFlows.isEmpty() ? partlySignedTx :
@@ -157,8 +156,7 @@ public interface MoveFlows {
 
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
             // The new holders that are not signers and still need to be informed.
-            final List<FlowSession> newHolderFlows = outputTokens
-                    .stream()
+            final List<FlowSession> newHolderFlows = outputTokens.stream()
                     .map(TokenState::getHolder)
                     .distinct()
                     // The signers are being handled in the other flows.
@@ -166,7 +164,9 @@ public interface MoveFlows {
                     .map(this::initiateFlow)
                     .collect(Collectors.toList());
             // Prime these responders to act in a holder type of way.
-            for (FlowSession it : newHolderFlows) {
+            // We need to use `for` instead of `.forEach` because we would need to annotate the lambda with
+            // @Suspendable.
+            for (final FlowSession it : newHolderFlows) {
                 it.send(OBSERVER);
             }
             final List<FlowSession> allFlows = new ArrayList<>(signerFlows);
@@ -211,7 +211,7 @@ public interface MoveFlows {
                     FINALISING_TRANSACTION);
         }
 
-        public Responder(@NotNull FlowSession counterpartySession) {
+        public Responder(@NotNull final FlowSession counterpartySession) {
             this.counterpartySession = counterpartySession;
             this.progressTracker = tracker();
         }
@@ -250,10 +250,7 @@ public interface MoveFlows {
                             } catch (SignatureException | AttachmentResolutionException | TransactionResolutionException ex) {
                                 throw new FlowException(ex);
                             }
-                            requireThat(req -> {
-                                req.using("I must be relevant.", relevant);
-                                return null;
-                            });
+                            if (!relevant) throw new FlowException("I must be relevant.");
                         }
                     };
                     txId = subFlow(signTransactionFlow).getId();
