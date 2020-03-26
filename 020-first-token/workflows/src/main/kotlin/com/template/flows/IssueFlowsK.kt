@@ -33,16 +33,16 @@ object IssueFlowsK {
         @Suppress("ClassName")
         companion object {
             object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on parameters.")
-            object SIGNING_TRANSACTION : ProgressTracker.Step("Signing transaction with our private key.")
             object VERIFYING_TRANSACTION : ProgressTracker.Step("Verifying contract constraints.")
+            object SIGNING_TRANSACTION : ProgressTracker.Step("Signing transaction with our private key.")
             object FINALISING_TRANSACTION : ProgressTracker.Step("Obtaining notary signature and recording transaction.") {
                 override fun childProgressTracker() = FinalityFlow.tracker()
             }
 
             fun tracker() = ProgressTracker(
                     GENERATING_TRANSACTION,
-                    SIGNING_TRANSACTION,
                     VERIFYING_TRANSACTION,
+                    SIGNING_TRANSACTION,
                     FINALISING_TRANSACTION
             )
         }
@@ -67,15 +67,20 @@ object IssueFlowsK {
                     .addCommand(txCommand)
             outputTokens.forEach { txBuilder.addOutputState(it, TokenContractK.TOKEN_CONTRACT_ID) }
 
+            progressTracker.currentStep = VERIFYING_TRANSACTION
+            txBuilder.verify(serviceHub)
+
             progressTracker.currentStep = SIGNING_TRANSACTION
             // We are the only issuer here, and the issuer's signature is required. So we sign.
             // There are no other signatures to collect.
             val fullySignedTx = serviceHub.signInitialTransaction(txBuilder)
 
-            progressTracker.currentStep = VERIFYING_TRANSACTION
-            txBuilder.verify(serviceHub)
-
             progressTracker.currentStep = FINALISING_TRANSACTION
+            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
+            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
+            // manually.
+            serviceHub.recordTransactions(StatesToRecord.ALL_VISIBLE, listOf(fullySignedTx))
+
             val holderFlows = outputTokens
                     .map { it.holder }
                     // Remove duplicates as it would be an issue when initiating flows, at least.
@@ -84,11 +89,6 @@ object IssueFlowsK {
                     // I already know what I am doing so no need to inform myself with a separate flow.
                     .minus(issuer)
                     .map { initiateFlow(it) }
-
-            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
-            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
-            // manually.
-            serviceHub.recordTransactions(StatesToRecord.ALL_VISIBLE, listOf(fullySignedTx))
 
             return subFlow(FinalityFlow(
                     fullySignedTx,

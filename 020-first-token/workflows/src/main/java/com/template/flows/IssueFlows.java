@@ -63,7 +63,7 @@ public interface IssueFlows {
         public Initiator(@NotNull final List<Pair<Party, Long>> heldQuantities) {
             //noinspection ConstantConditions
             if (heldQuantities == null) throw new NullPointerException("heldQuantities cannot be null");
-            this.heldQuantities = heldQuantities;
+            this.heldQuantities = ImmutableList.copyOf(heldQuantities);
             this.progressTracker = tracker();
         }
 
@@ -108,15 +108,20 @@ public interface IssueFlows {
                     .addCommand(txCommand);
             outputTokens.forEach(it -> txBuilder.addOutputState(it, TokenContract.TOKEN_CONTRACT_ID));
 
+            progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
+            txBuilder.verify(getServiceHub());
+
             progressTracker.setCurrentStep(SIGNING_TRANSACTION);
             // We are the only issuer here, and the issuer's signature is required. So we sign.
             // There are no other signatures to collect.
             final SignedTransaction fullySignedTx = getServiceHub().signInitialTransaction(txBuilder);
 
-            progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
-            txBuilder.verify(getServiceHub());
-
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
+            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
+            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
+            // manually.
+            getServiceHub().recordTransactions(StatesToRecord.ALL_VISIBLE, ImmutableList.of(fullySignedTx));
+
             // Thanks to the Stream, we are able to have our 'final List' in one go, instead of creating a modifiable
             // one and then conditionally adding elements to it with for... add.
             final List<FlowSession> holderFlows = outputTokens.stream()
@@ -132,11 +137,6 @@ public interface IssueFlows {
                     .map(this::initiateFlow)
                     // Get away from a Stream and back to a good ol' List.
                     .collect(Collectors.toList());
-
-            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
-            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
-            // manually.
-            getServiceHub().recordTransactions(StatesToRecord.ALL_VISIBLE, ImmutableList.of(fullySignedTx));
 
             return subFlow(new FinalityFlow(
                     fullySignedTx,
