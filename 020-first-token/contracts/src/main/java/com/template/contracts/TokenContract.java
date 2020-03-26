@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 import static net.corda.core.contracts.ContractsDSL.requireSingleCommand;
 import static net.corda.core.contracts.ContractsDSL.requireThat;
 
-public class TokenContract implements Contract {
+public final class TokenContract implements Contract {
     public static final String TOKEN_CONTRACT_ID = "com.template.contracts.TokenContract";
 
     @Override
