@@ -12,6 +12,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -31,10 +32,9 @@ public class IssueFlowsTests {
     private final StartedMockNode dan = network.createNode();
 
     public IssueFlowsTests() {
-        alice.registerInitiatedFlow(IssueFlows.Responder.class);
-        bob.registerInitiatedFlow(IssueFlows.Responder.class);
-        carly.registerInitiatedFlow(IssueFlows.Responder.class);
-        dan.registerInitiatedFlow(IssueFlows.Responder.class);
+        Arrays.asList(alice, bob, carly, dan).forEach(it -> {
+            it.registerInitiatedFlow(IssueFlows.Responder.class);
+        });
     }
 
     @Before

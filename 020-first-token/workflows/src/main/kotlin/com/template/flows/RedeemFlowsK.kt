@@ -25,7 +25,7 @@ object RedeemFlowsK {
      * user-friendly in terms of parameters passed. For instance, given sums, it would fetch the precise states in
      * the vault. Look at [SimpleInitiator] for such an example.
      */
-    class Initiator(
+    class Initiator @JvmOverloads constructor(
             // By requiring an exact list of states, this flow assures absolute precision at the expense of
             // user-friendliness.
             private val inputTokens: List<StateAndRef<TokenStateK>>,

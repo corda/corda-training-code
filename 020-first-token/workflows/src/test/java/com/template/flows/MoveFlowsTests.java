@@ -34,9 +34,9 @@ public class MoveFlowsTests {
     private final StartedMockNode dan = network.createNode();
 
     public MoveFlowsTests() {
-        Arrays.asList(alice, bob, carly).forEach(it -> {
+        Arrays.asList(alice, bob, carly, dan).forEach(it -> {
             it.registerInitiatedFlow(IssueFlows.Responder.class);
-            it.registerInitiatedFlow(RedeemFlows.Responder.class);
+            it.registerInitiatedFlow(MoveFlows.Initiator.class, MoveFlows.Responder.class);
         });
     }
 

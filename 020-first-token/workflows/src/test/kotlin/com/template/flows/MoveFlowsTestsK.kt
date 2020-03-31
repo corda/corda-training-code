@@ -28,9 +28,9 @@ class MoveFlowsTestsK {
     private val dan = network.createNode()
 
     init {
-        listOf(alice, bob, carly).forEach {
+        listOf(alice, bob, carly, dan).forEach {
             it.registerInitiatedFlow(IssueFlowsK.Responder::class.java)
-            it.registerInitiatedFlow(RedeemFlowsK.Responder::class.java)
+            it.registerInitiatedFlow(MoveFlowsK.Initiator::class.java, MoveFlowsK.Responder::class.java)
         }
     }
 

@@ -76,20 +76,31 @@ public interface MoveFlows {
         public static ProgressTracker tracker() {
             return new ProgressTracker(
                     GENERATING_TRANSACTION,
+                    VERIFYING_TRANSACTION,
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,
-                    VERIFYING_TRANSACTION,
                     FINALISING_TRANSACTION);
         }
 
         public Initiator(
                 @NotNull final List<StateAndRef<TokenState>> inputTokens,
-                @NotNull final List<TokenState> outputTokens) {
+                @NotNull final List<TokenState> outputTokens,
+                @NotNull final ProgressTracker progressTracker) {
+            //noinspection ConstantConditions
+            if (inputTokens == null) throw new NullPointerException("inputTokens cannot be null");
             this.inputTokens = inputTokens;
+            //noinspection ConstantConditions
+            if (outputTokens == null) throw new NullPointerException("outputTokens cannot be null");
             this.outputTokens = outputTokens;
-            this.progressTracker = tracker();
+            //noinspection ConstantConditions
+            if (progressTracker == null) throw new NullPointerException("progressTracker cannot be null");
+            this.progressTracker = progressTracker;
         }
 
+        public Initiator(@NotNull final List<StateAndRef<TokenState>> inputTokens,
+                         @NotNull final List<TokenState> outputTokens) {
+            this(inputTokens, outputTokens, tracker());
+        }
 
         @NotNull
         @Override
@@ -104,6 +115,7 @@ public interface MoveFlows {
             // We can only make a transaction if all states have to be marked by the same notary.
             final Set<Party> notaries = inputTokens.stream()
                     .map(it -> it.getState().getNotary())
+                    // This gets rid of duplicates.
                     .collect(Collectors.toSet());
             if (notaries.size() != 1) {
                 throw new FlowException("There must be only 1 notary, not " + notaries.size());
@@ -115,6 +127,7 @@ public interface MoveFlows {
                     .map(it -> it.getState().getData().getHolder())
                     // Remove duplicates as it would be an issue when initiating flows, at least.
                     .collect(Collectors.toSet());
+            // We don't want to sign transactions where our signature is not needed.
             if (!allSigners.contains(getOurIdentity())) {
                 throw new FlowException("I must be a holder.");
             }
@@ -127,6 +140,9 @@ public interface MoveFlows {
                     .addCommand(txCommand);
             inputTokens.forEach(txBuilder::addInputState);
             outputTokens.forEach(it -> txBuilder.addOutputState(it, TokenContract.TOKEN_CONTRACT_ID));
+
+            progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
+            txBuilder.verify(getServiceHub());
 
             progressTracker.setCurrentStep(SIGNING_TRANSACTION);
             // We are but one of the signers.
@@ -150,9 +166,6 @@ public interface MoveFlows {
                             partlySignedTx,
                             signerFlows,
                             GATHERING_SIGS.childProgressTracker()));
-
-            progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
-            txBuilder.verify(getServiceHub());
 
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
             // The new holders that are not signers and still need to be informed.
@@ -179,7 +192,6 @@ public interface MoveFlows {
         }
     }
 
-    @InitiatedBy(Initiator.class)
     class Responder extends FlowLogic<SignedTransaction> {
         @NotNull
         private final FlowSession counterpartySession;

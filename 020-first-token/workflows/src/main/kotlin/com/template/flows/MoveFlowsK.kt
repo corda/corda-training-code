@@ -30,9 +30,10 @@ object MoveFlowsK {
      * This constructor would be called by RPC or by [FlowLogic.subFlow]. In particular one that, given sums, fetches
      * states in the vault.
      */
-    class Initiator(
+    class Initiator @JvmOverloads constructor(
             private val inputTokens: List<StateAndRef<TokenStateK>>,
-            private val outputTokens: List<TokenStateK>) : FlowLogic<SignedTransaction>() {
+            private val outputTokens: List<TokenStateK>,
+            override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
 
         @Suppress("ClassName")
         companion object {
@@ -49,14 +50,12 @@ object MoveFlowsK {
 
             fun tracker() = ProgressTracker(
                     GENERATING_TRANSACTION,
+                    VERIFYING_TRANSACTION,
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,
-                    VERIFYING_TRANSACTION,
                     FINALISING_TRANSACTION
             )
         }
-
-        override val progressTracker = tracker()
 
         @Suspendable
         override fun call(): SignedTransaction {
@@ -64,6 +63,7 @@ object MoveFlowsK {
             // We can only make a transaction if all states have to be marked by the same notary.
             val notary = inputTokens
                     .map { it.state.notary }
+                    // This gets rid of duplicates.
                     .distinct()
                     .single()
 
@@ -74,17 +74,18 @@ object MoveFlowsK {
                     .distinct()
                     // We don't want to sign transactions where our signature is not needed.
                     .also { if (!it.contains(ourIdentity)) throw FlowException("I must be a holder.") }
-                    // Remove myself.
-                    .minus(ourIdentity)
 
             // The issuers and holders are required signers, so we express this here.
             val txCommand = Command(
                     Move(),
-                    signers.plus(ourIdentity).map { it.owningKey })
+                    signers.map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
             inputTokens.forEach { txBuilder.addInputState(it) }
             outputTokens.forEach { txBuilder.addOutputState(it, TokenContractK.TOKEN_CONTRACT_ID) }
+
+            progressTracker.currentStep = VERIFYING_TRANSACTION
+            txBuilder.verify(serviceHub)
 
             progressTracker.currentStep = SIGNING_TRANSACTION
             // We are but one of the signers.
@@ -93,6 +94,8 @@ object MoveFlowsK {
             progressTracker.currentStep = GATHERING_SIGS
             // We need to gather the signatures of all issuers and all holders, except ourselves.
             val signerFlows = signers
+                    // Remove myself.
+                    .minus(ourIdentity)
                     .map { initiateFlow(it) }
                     // Prime these responders to act in a signer type of way.
                     .onEach { it.send(TransactionRole.PARTICIPANT) }
@@ -102,9 +105,6 @@ object MoveFlowsK {
                             partlySignedTx,
                             signerFlows,
                             GATHERING_SIGS.childProgressTracker()))
-
-            progressTracker.currentStep = VERIFYING_TRANSACTION
-            txBuilder.verify(serviceHub)
 
             progressTracker.currentStep = FINALISING_TRANSACTION
             // The new holders that are not signers and still need to be informed.
@@ -126,7 +126,6 @@ object MoveFlowsK {
         }
     }
 
-    @InitiatedBy(Initiator::class)
     open class Responder(private val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
 
         @Suppress("ClassName")
