@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.template.contracts.TokenContract.Commands.Redeem;
-import static net.corda.core.contracts.ContractsDSL.requireThat;
 
 public interface RedeemFlows {
 
@@ -46,6 +45,7 @@ public interface RedeemFlows {
         private final ProgressTracker progressTracker;
 
         public final static Step GENERATING_TRANSACTION = new Step("Generating transaction based on parameters.");
+        public final static Step VERIFYING_TRANSACTION = new Step("Verifying contract constraints.");
         public final static Step SIGNING_TRANSACTION = new Step("Signing transaction with our private key.");
         public final static Step GATHERING_SIGS = new Step("Gathering the counterparty's signature.") {
             @Override
@@ -53,7 +53,6 @@ public interface RedeemFlows {
                 return CollectSignaturesFlow.Companion.tracker();
             }
         };
-        public final static Step VERIFYING_TRANSACTION = new Step("Verifying contract constraints.");
         public final static Step FINALISING_TRANSACTION = new Step("Obtaining notary signature and recording transaction.") {
             @Override
             public ProgressTracker childProgressTracker() {
@@ -65,9 +64,9 @@ public interface RedeemFlows {
         public static ProgressTracker tracker() {
             return new ProgressTracker(
                     GENERATING_TRANSACTION,
+                    VERIFYING_TRANSACTION,
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,
-                    VERIFYING_TRANSACTION,
                     FINALISING_TRANSACTION);
         }
 
@@ -98,8 +97,7 @@ public interface RedeemFlows {
         public SignedTransaction call() throws FlowException {
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
             // We can only make a transaction if all states have to be marked by the same notary.
-            final Set<Party> notaries = inputTokens
-                    .stream()
+            final Set<Party> notaries = inputTokens.stream()
                     .map(it -> it.getState().getNotary())
                     .collect(Collectors.toSet());
             if (notaries.size() != 1) {
@@ -107,19 +105,16 @@ public interface RedeemFlows {
             }
             final Party notary = notaries.iterator().next();
 
-            final List<Party> otherSigners = inputTokens.stream()
+            final Set<Party> allSigners = inputTokens.stream()
                     .map(it -> it.getState().getData())
                     // Keep a mixed list of issuers and holders.
                     .flatMap(it -> Stream.of(it.getIssuer(), it.getHolder()))
                     // Remove duplicates as it would be an issue when initiating flows, at least.
-                    .distinct()
-                    // Remove myself.
-                    .filter(it -> !it.equals(getOurIdentity()))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
+            // We don't want to sign transactions where our signature is not needed.
+            if (!allSigners.contains(getOurIdentity())) throw new FlowException("I must be an issuer or a holder.");
 
             // The issuers and holders are required signers, so we express this here.
-            final List<Party> allSigners = new ArrayList<>(otherSigners);
-            allSigners.add(getOurIdentity());
             final Command<Redeem> txCommand = new Command<>(
                     new Redeem(),
                     allSigners.stream().map(Party::getOwningKey).collect(Collectors.toList()));
@@ -127,13 +122,18 @@ public interface RedeemFlows {
                     .addCommand(txCommand);
             inputTokens.forEach(txBuilder::addInputState);
 
+            progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
+            txBuilder.verify(getServiceHub());
+
             progressTracker.setCurrentStep(SIGNING_TRANSACTION);
             // We are but one of the signers.
             final SignedTransaction partlySignedTx = getServiceHub().signInitialTransaction(txBuilder);
 
             progressTracker.setCurrentStep(GATHERING_SIGS);
             // We need to gather the signatures of all issuers and all holders, except ourselves.
-            final List<FlowSession> otherFlows = otherSigners.stream()
+            final List<FlowSession> otherFlows = allSigners.stream()
+                    // Remove myself.
+                    .filter(it -> !it.equals(getOurIdentity()))
                     .map(this::initiateFlow)
                     .collect(Collectors.toList());
             final SignedTransaction fullySignedTx = otherFlows.isEmpty() ? partlySignedTx :
@@ -141,9 +141,6 @@ public interface RedeemFlows {
                             partlySignedTx,
                             otherFlows,
                             GATHERING_SIGS.childProgressTracker()));
-
-            progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
-            txBuilder.verify(getServiceHub());
 
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
             return subFlow(new FinalityFlow(
@@ -163,8 +160,7 @@ public interface RedeemFlows {
      * Additionally, when "your" responder is launched, you have no assurance that the peer that triggered the flow
      * used "your" initiator. The initiating peer may well have used a sub-class of "your" initiator.
      */
-    @InitiatedBy(Initiator.class)
-    class Responder extends FlowLogic<SignedTransaction> {
+    abstract class Responder extends FlowLogic<SignedTransaction> {
 
         @NotNull
         private final FlowSession counterpartySession;
@@ -208,12 +204,11 @@ public interface RedeemFlows {
         }
 
         /**
-         * Peers can create sub-classes and extends the checks on the transaction by overriding this dummy function.
+         * Peers can create sub-classes and extend the checks on the transaction by overriding this abstract function.
          * In particular, peers will be well advised to add logic here to control whether they really want this
          * transaction to happen.
          */
-        protected void additionalChecks(@NotNull final SignedTransaction stx) throws FlowException {
-        }
+        protected abstract void additionalChecks(@NotNull final SignedTransaction stx) throws FlowException;
 
         @Suspendable
         @Override
@@ -221,7 +216,7 @@ public interface RedeemFlows {
             progressTracker.setCurrentStep(SIGNING_TRANSACTION);
             final SignTransactionFlow signTransactionFlow = new SignTransactionFlow(counterpartySession) {
                 @Override
-                public void checkTransaction(@NotNull final SignedTransaction stx) throws FlowException {
+                protected void checkTransaction(@NotNull final SignedTransaction stx) throws FlowException {
                     // We add our internal check for clients that want to extend this feature.
                     additionalChecks(stx);
                     // Here have the checks that presumably all peers will want to have. It is opinionated and peers
@@ -238,10 +233,7 @@ public interface RedeemFlows {
                     } catch (SignatureException | AttachmentResolutionException | TransactionResolutionException ex) {
                         throw new FlowException(ex);
                     }
-                    requireThat(req -> {
-                        req.using("I must be relevant.", relevant);
-                        return null;
-                    });
+                    if (!relevant) throw new FlowException("I must be relevant.");
                 }
             };
             final SecureHash txId = subFlow(signTransactionFlow).getId();
@@ -256,23 +248,29 @@ public interface RedeemFlows {
      * helps us avoid constant recalculation.
      */
     class StateAccumulator {
+        final private long maximumSum;
         final public long sum;
         @NotNull
         final public List<StateAndRef<TokenState>> states;
 
-        public StateAccumulator() {
-            this(Collections.emptyList());
+        public StateAccumulator(final long maximumSum) {
+            this(maximumSum, Collections.emptyList());
         }
 
-        public StateAccumulator(@NotNull final List<StateAndRef<TokenState>> states) {
-            this(states.stream()
-                            .reduce(0L,
-                                    (sum, state) -> Math.addExact(sum, state.getState().getData().getQuantity()),
-                                    Math::addExact),
+        public StateAccumulator(final long maximumSum, @NotNull final List<StateAndRef<TokenState>> states) {
+            this(
+                    maximumSum,
+                    states.stream().reduce(0L,
+                            (sum, state) -> Math.addExact(sum, state.getState().getData().getQuantity()),
+                            Math::addExact),
                     states);
         }
 
-        private StateAccumulator(final long sum, @NotNull final List<StateAndRef<TokenState>> states) {
+        private StateAccumulator(
+                final long maximumSum,
+                final long sum,
+                @NotNull final List<StateAndRef<TokenState>> states) {
+            this.maximumSum = maximumSum;
             this.sum = sum;
             this.states = ImmutableList.copyOf(states);
         }
@@ -282,30 +280,39 @@ public interface RedeemFlows {
          */
         @NotNull
         public StateAccumulator plus(@NotNull final StateAccumulator other) {
-            final List<StateAndRef<TokenState>> joined = new ArrayList<>(states);
-            joined.addAll(other.states);
-            return new StateAccumulator(Math.addExact(sum, other.sum), joined);
+            if (other.states.size() == 0) return this;
+            final StateAndRef<TokenState> first = other.states.get(0);
+            return this
+                    .plus(first)
+                    .plus(other.minus(first));
         }
 
         /**
-         * Add a state to the list and update the sum as we do.
+         * Add a state only if the current sum is strictly below the max sum given,
+         * and update the sum as we do.
          */
         @NotNull
         public StateAccumulator plus(@NotNull final StateAndRef<TokenState> state) {
+            if (maximumSum <= sum) return this;
             final List<StateAndRef<TokenState>> joined = new ArrayList<>(states);
             joined.add(state);
             return new StateAccumulator(
+                    maximumSum,
                     Math.addExact(sum, state.getState().getData().getQuantity()),
                     joined);
         }
 
         /**
-         * Add a state only if the current sum is strictly below the max sum given.
+         * Remove a state if it is found in the list. And update the sum as we do.
          */
         @NotNull
-        public StateAccumulator plusIfSumBelow(@NotNull final StateAndRef<TokenState> state, final long maxSum) {
-            if (maxSum <= sum) return this;
-            else return plus(state);
+        public StateAccumulator minus(@NotNull final StateAndRef<TokenState> state) {
+            if (!states.contains(state)) throw new IllegalArgumentException("State not found");
+            return new StateAccumulator(
+                    maximumSum,
+                    Math.subtractExact(sum, state.getState().getData().getQuantity()),
+                    states.stream().filter(it -> !it.equals(state)).collect(Collectors.toList())
+            );
         }
     }
 
@@ -385,7 +392,7 @@ public interface RedeemFlows {
                 final long remainingSum,
                 @NotNull final PageSpecification paging) throws FlowException {
             // We reached the desired state already.
-            if (remainingSum <= 0) return new StateAccumulator();
+            if (remainingSum <= 0) return new StateAccumulator(0L);
             final List<StateAndRef<TokenState>> pagedStates = getServiceHub().getVaultService()
                     .queryBy(TokenState.class, tokenCriteria, paging)
                     .getStates();
@@ -396,14 +403,14 @@ public interface RedeemFlows {
                     .filter(it -> it.getState().getData().getIssuer().equals(issuer))
                     // We will keep only up to the point where we have have enough.
                     .reduce(
-                            new StateAccumulator(),
-                            (accumulator, state) -> accumulator.plusIfSumBelow(state, totalQuantity),
+                            new StateAccumulator(remainingSum),
+                            StateAccumulator::plus,
                             StateAccumulator::plus);
 
             // Let's fetch some more, possibly an empty list.
             return fetched.plus(fetchWorthAtLeast(
                     // If this number is 0 or less, we will get an empty list.
-                    totalQuantity - fetched.sum,
+                    remainingSum - fetched.sum,
                     // Take the next page
                     paging.copy(paging.getPageNumber() + 1, paging.getPageSize())
             ));
@@ -420,16 +427,11 @@ public interface RedeemFlows {
             // exact quantity wanted.
             final SignedTransaction moveTx = accumulated.sum <= totalQuantity ? null :
                     subFlow(new MoveFlows.Initiator(accumulated.states, Arrays.asList(
-                    new TokenState(issuer, getOurIdentity(), totalQuantity), // Index 0 in outputs.
-                    new TokenState(issuer, getOurIdentity(), accumulated.sum - totalQuantity))));
+                            new TokenState(issuer, getOurIdentity(), totalQuantity), // Index 0 in outputs.
+                            new TokenState(issuer, getOurIdentity(), accumulated.sum - totalQuantity))));
 
-            final List<StateAndRef<TokenState>> toUse;
-            try {
-                toUse = moveTx == null ? accumulated.states :
-                        Collections.singletonList(moveTx.toLedgerTransaction(getServiceHub()).outRef(0));
-            } catch (SignatureException ex) {
-                throw new FlowException(ex);
-            }
+            final List<StateAndRef<TokenState>> toUse = moveTx == null ? accumulated.states :
+                    Collections.singletonList(moveTx.getTx().outRef(0));
 
             progressTracker.setCurrentStep(HANDING_TO_INITIATOR);
             return new Pair<>(moveTx, subFlow(new Initiator(

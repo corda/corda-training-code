@@ -12,7 +12,6 @@ import net.corda.core.contracts.StateRef;
 import net.corda.core.contracts.TransactionState;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowSession;
-import net.corda.core.flows.InitiatedBy;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.*;
 import org.jetbrains.annotations.NotNull;
@@ -27,7 +26,6 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static com.template.flows.FlowHelpers.*;
-import static net.corda.core.contracts.ContractsDSL.requireThat;
 import static org.junit.Assert.*;
 
 public class RedeemFlowsTests {
@@ -44,10 +42,22 @@ public class RedeemFlowsTests {
     public RedeemFlowsTests() {
         Arrays.asList(alice, bob, carly).forEach(it -> {
             it.registerInitiatedFlow(IssueFlows.Responder.class);
-            it.registerInitiatedFlow(RedeemFlows.Responder.class);
+            it.registerInitiatedFlow(RedeemFlows.Initiator.class, UnsafeResponder.class);
         });
         dan.registerInitiatedFlow(IssueFlows.Responder.class);
-        dan.registerInitiatedFlow(SkintResponder.class);
+        dan.registerInitiatedFlow(RedeemFlows.Initiator.class, SkintResponder.class);
+    }
+
+    private static class UnsafeResponder extends RedeemFlows.Responder {
+
+        public UnsafeResponder(@NotNull FlowSession counterpartySession) {
+            super(counterpartySession);
+        }
+
+        @Override
+        protected void additionalChecks(@NotNull SignedTransaction stx) {
+            // Unsafe, so do nothing.
+        }
     }
 
     @Before
@@ -82,8 +92,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         final SignedTransaction tx = future.get();
+
         tx.verifySignaturesExcept(Arrays.asList(
                 bob.getInfo().getLegalIdentities().get(0).getOwningKey(),
                 carly.getInfo().getLegalIdentities().get(0).getOwningKey()));
@@ -103,8 +113,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         final SignedTransaction tx = future.get();
+
         // We check the recorded transaction in both transaction storages.
         for (StartedMockNode node : Arrays.asList(alice, bob)) {
             assertEquals(tx, node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
@@ -123,8 +133,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         final SignedTransaction tx = future.get();
+
         // We check the recorded transaction in both transaction storages.
         for (StartedMockNode node : Arrays.asList(alice, bob, carly)) {
             assertEquals(tx, node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
@@ -141,8 +151,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         final SignedTransaction tx = future.get();
+
         // We check the recorded transaction in transaction storages.
         for (StartedMockNode node : Arrays.asList(alice, bob, carly)) {
             assertEquals(tx, node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
@@ -158,8 +168,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         final SignedTransaction tx = future.get();
+
         // We check the recorded transaction in both vaults.
         for (StartedMockNode node : Arrays.asList(alice, bob)) {
             final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
@@ -177,8 +187,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         future.get();
+
         // We check the state was consumed in both vaults.
         assertHasStatesInVault(alice, Collections.emptyList());
         assertHasStatesInVault(alice, Collections.emptyList());
@@ -195,8 +205,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         final SignedTransaction tx = future.get();
+
         // We check the recorded transaction in the 3 vaults.
         for (StartedMockNode node : Arrays.asList(alice, bob, carly)) {
             final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
@@ -217,8 +227,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         future.get();
+
         // We check the recorded state in the 4 vaults.
         assertHasStatesInVault(alice, Collections.emptyList());
         assertHasStatesInVault(bob, Collections.emptyList());
@@ -239,8 +249,8 @@ public class RedeemFlowsTests {
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-
         final SignedTransaction tx = future.get();
+
         // We check the recorded transaction in all 3 vaults.
         for (StartedMockNode node : Arrays.asList(alice, bob, dan)) {
             final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
@@ -271,8 +281,7 @@ public class RedeemFlowsTests {
     /**
      * This is an example of another responder that sub-classes the basic Responder.
      */
-    @InitiatedBy(Initiator.class)
-    static class SkintResponder extends RedeemFlows.Responder {
+    private static class SkintResponder extends RedeemFlows.Responder {
 
         private final long MAX_QUANTITY = 20L;
 
@@ -282,12 +291,10 @@ public class RedeemFlowsTests {
 
         @Override
         public void additionalChecks(@NotNull final SignedTransaction stx) throws FlowException {
-            super.additionalChecks(stx);
             final boolean lowEnough;
             try {
                 lowEnough = stx.toLedgerTransaction(getServiceHub(), false)
-                        .inputsOfType(TokenState.class)
-                        .stream()
+                        .inputsOfType(TokenState.class).stream()
                         // It only cares if we are a holder
                         .filter(it -> it.getHolder().equals(getOurIdentity()))
                         // No individual token should have a quantity too high. That's a strange requirement, but it is
@@ -296,10 +303,7 @@ public class RedeemFlowsTests {
             } catch (SignatureException ex) {
                 throw new FlowException(ex);
             }
-            requireThat(req -> {
-                req.using("Quantity must not be too high.", lowEnough);
-                return null;
-            });
+            if (!lowEnough) throw new FlowException("Quantity must not be too high.");
         }
     }
 
@@ -319,8 +323,9 @@ public class RedeemFlowsTests {
                 30L);
         final CordaFuture<Pair<SignedTransaction, SignedTransaction>> future = bob.startFlow(flow);
         network.runNetwork();
-
         final Pair<SignedTransaction, SignedTransaction> txPair = future.get();
+
+        assertNull(txPair.getKey());
         // We check the recorded transaction in both vaults.
         for (StartedMockNode node : Arrays.asList(alice, bob)) {
             final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(txPair.getValue().getId());
@@ -349,8 +354,9 @@ public class RedeemFlowsTests {
                 35L);
         final CordaFuture<Pair<SignedTransaction, SignedTransaction>> future = bob.startFlow(flow);
         network.runNetwork();
-
         final Pair<SignedTransaction, SignedTransaction> txPair = future.get();
+
+        assertNull(txPair.getKey());
         // We check the recorded transaction in both vaults.
         for (StartedMockNode node : Arrays.asList(alice, bob)) {
             final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(txPair.getValue().getId());
@@ -407,7 +413,7 @@ public class RedeemFlowsTests {
 
         // We check the move recorded transaction in bob's vault.
         final SignedTransaction moveTx = bob.getServices().getValidatedTransactions().getTransaction(txPair.getKey().getId());
-        @SuppressWarnings("ConstantConditions")
+        //noinspection ConstantConditions
         final List<StateRef> moveTxInputs = moveTx.getTx().getInputs();
         assertEquals(3, moveTxInputs.size());
         assertEquals(expected0, bob.getServices().toStateAndRef(moveTxInputs.get(0)).getState().getData());
@@ -421,7 +427,7 @@ public class RedeemFlowsTests {
         // We check the redeem recorded transaction in both vaults.
         for (StartedMockNode node : Arrays.asList(alice, bob)) {
             final SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(txPair.getValue().getId());
-            @SuppressWarnings("ConstantConditions")
+            //noinspection ConstantConditions
             final List<StateRef> txInputs = recordedTx.getTx().getInputs();
             assertEquals(1, txInputs.size());
             assertEquals(expected3, node.getServices().toStateAndRef(txInputs.get(0)).getState().getData());

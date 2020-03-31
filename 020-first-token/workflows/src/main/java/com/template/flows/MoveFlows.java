@@ -54,6 +54,7 @@ public interface MoveFlows {
         private final ProgressTracker progressTracker;
 
         private final static Step GENERATING_TRANSACTION = new Step("Generating transaction based on parameters.");
+        private final static Step VERIFYING_TRANSACTION = new Step("Verifying contract constraints.");
         private final static Step SIGNING_TRANSACTION = new Step("Signing transaction with our private key.");
         private final static Step GATHERING_SIGS = new Step("Gathering the counterparty's signature.") {
             @NotNull
@@ -63,7 +64,6 @@ public interface MoveFlows {
             }
         };
 
-        private final static Step VERIFYING_TRANSACTION = new Step("Verifying contract constraints.");
         private final static Step FINALISING_TRANSACTION = new Step("Obtaining notary signature and recording transaction.") {
             @NotNull
             @Override
@@ -128,9 +128,8 @@ public interface MoveFlows {
                     // Remove duplicates as it would be an issue when initiating flows, at least.
                     .collect(Collectors.toSet());
             // We don't want to sign transactions where our signature is not needed.
-            if (!allSigners.contains(getOurIdentity())) {
-                throw new FlowException("I must be a holder.");
-            }
+            if (!allSigners.contains(getOurIdentity())) throw new FlowException("I must be a holder.");
+
 
             // The issuers and holders are required signers, so we express this here.
             final Command<Move> txCommand = new Command<>(

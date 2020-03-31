@@ -2,10 +2,8 @@ package com.template.flows
 
 import com.google.common.collect.ImmutableList
 import com.template.states.TokenStateK
-import net.corda.core.contracts.requireThat
 import net.corda.core.flows.FlowException
 import net.corda.core.flows.FlowSession
-import net.corda.core.flows.InitiatedBy
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.getOrThrow
 import net.corda.testing.core.singleIdentity
@@ -35,10 +33,19 @@ class RedeemFlowsTestsK {
     init {
         listOf(alice, bob, carly).forEach {
             it.registerInitiatedFlow(IssueFlowsK.Responder::class.java)
-            it.registerInitiatedFlow(RedeemFlowsK.Responder::class.java)
+            it.registerInitiatedFlow(RedeemFlowsK.Initiator::class.java, UnsafeResponder::class.java)
         }
         dan.registerInitiatedFlow(IssueFlowsK.Responder::class.java)
-        dan.registerInitiatedFlow(SkintResponder::class.java)
+        dan.registerInitiatedFlow(RedeemFlowsK.Initiator::class.java, SkintResponder::class.java)
+    }
+
+    private class UnsafeResponder(
+            counterpartySession: FlowSession) :
+            RedeemFlowsK.Responder(counterpartySession) {
+
+        override fun additionalChecks(stx: SignedTransaction) {
+            // Unsafe, so do nothing.
+        }
     }
 
     @Before
@@ -189,7 +196,7 @@ class RedeemFlowsTestsK {
     fun `there are no recorded states after redeem`() {
         val tokens = alice.issueTokens(network, listOf(
                 NodeHolding(bob, 10L),
-                NodeHolding(carly, 20L)))
+                NodeHolding(carly, 21L)))
 
         val flow = RedeemFlowsK.Initiator(tokens)
         val future = bob.startFlow(flow)
@@ -241,18 +248,16 @@ class RedeemFlowsTestsK {
         assertFailsWith<FlowException> { future.getOrThrow() }
     }
 
-    @InitiatedBy(RedeemFlowsK.Initiator::class)
     /**
      * This is an example of another responder that sub-classes the basic Responder.
      */
-    class SkintResponder(counterpartySession: FlowSession) : RedeemFlowsK.Responder(counterpartySession) {
+    private class SkintResponder(counterpartySession: FlowSession) : RedeemFlowsK.Responder(counterpartySession) {
 
         companion object {
             const val MAX_QUANTITY = 20L
         }
 
         override fun additionalChecks(stx: SignedTransaction) {
-            super.additionalChecks(stx)
             val lowEnough = stx.toLedgerTransaction(serviceHub, false)
                     .inputsOfType<TokenStateK>()
                     // It only cares if we are a holder
@@ -260,9 +265,7 @@ class RedeemFlowsTestsK {
                     // No individual token should have a quantity too high. That's a strange requirement, but it is
                     // here to make a point.
                     .all { it.quantity <= MAX_QUANTITY }
-            requireThat {
-                "Quantity must not be too high." using lowEnough
-            }
+            if (!lowEnough) throw FlowException("Quantity must not be too high.")
         }
     }
 
@@ -284,6 +287,7 @@ class RedeemFlowsTestsK {
         network.runNetwork()
         val txPair = future.getOrThrow()
 
+        assertNull(txPair.first)
         // We check the recorded transaction in both vaults.
         for (node in listOf(alice, bob)) {
             assertNull(txPair.first)
@@ -315,6 +319,7 @@ class RedeemFlowsTestsK {
         network.runNetwork()
         val txPair = future.getOrThrow()
 
+        assertNull(txPair.first)
         // We check the recorded transaction in both vaults.
         for (node in listOf(alice, bob)) {
             assertNull(txPair.first)

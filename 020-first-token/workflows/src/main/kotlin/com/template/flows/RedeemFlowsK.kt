@@ -5,7 +5,6 @@ import com.template.contracts.TokenContractK.Commands.Redeem
 import com.template.states.TokenStateK
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndRef
-import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
 import net.corda.core.node.services.vault.PageSpecification
@@ -34,21 +33,21 @@ object RedeemFlowsK {
         @Suppress("ClassName")
         companion object {
             object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on parameters.")
+            object VERIFYING_TRANSACTION : ProgressTracker.Step("Verifying contract constraints.")
             object SIGNING_TRANSACTION : ProgressTracker.Step("Signing transaction with our private key.")
             object GATHERING_SIGS : ProgressTracker.Step("Gathering the counterparty's signature.") {
                 override fun childProgressTracker() = CollectSignaturesFlow.tracker()
             }
 
-            object VERIFYING_TRANSACTION : ProgressTracker.Step("Verifying contract constraints.")
             object FINALISING_TRANSACTION : ProgressTracker.Step("Obtaining notary signature and recording transaction.") {
                 override fun childProgressTracker() = FinalityFlow.tracker()
             }
 
             fun tracker() = ProgressTracker(
                     GENERATING_TRANSACTION,
+                    VERIFYING_TRANSACTION,
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,
-                    VERIFYING_TRANSACTION,
                     FINALISING_TRANSACTION)
         }
 
@@ -61,22 +60,25 @@ object RedeemFlowsK {
                     .distinct()
                     .single()
 
-            val otherSigners = inputTokens
+            val allSigners = inputTokens
                     .map { it.state.data }
                     // Keep a mixed list of issuers and holders.
                     .flatMap { listOf(it.issuer, it.holder) }
                     // Remove duplicates as it would be an issue when initiating flows, at least.
-                    .distinct()
-                    // Remove myself.
-                    .minus(ourIdentity)
+                    .toSet()
+            // We don't want to sign transactions where our signature is not needed.
+            if (!allSigners.contains(ourIdentity)) throw FlowException("I must be an issuer or a holder.")
 
             // The issuers and holders are required signers, so we express this here.
             val txCommand = Command(
                     Redeem(),
-                    otherSigners.plus(ourIdentity).map { it.owningKey })
+                    allSigners.map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
             inputTokens.forEach { txBuilder.addInputState(it) }
+
+            progressTracker.currentStep = VERIFYING_TRANSACTION
+            txBuilder.verify(serviceHub)
 
             progressTracker.currentStep = SIGNING_TRANSACTION
             // We are but one of the signers.
@@ -84,7 +86,9 @@ object RedeemFlowsK {
 
             progressTracker.currentStep = GATHERING_SIGS
             // We need to gather the signatures of all issuers and all holders, except ourselves.
-            val otherFlows = otherSigners
+            val otherFlows = allSigners
+                    // Remove myself.
+                    .minus(ourIdentity)
                     .map { initiateFlow(it) }
             val fullySignedTx =
                     if (otherFlows.isEmpty()) partlySignedTx
@@ -92,9 +96,6 @@ object RedeemFlowsK {
                             partlySignedTx,
                             otherFlows,
                             GATHERING_SIGS.childProgressTracker()))
-
-            progressTracker.currentStep = VERIFYING_TRANSACTION
-            txBuilder.verify(serviceHub)
 
             progressTracker.currentStep = FINALISING_TRANSACTION
             return subFlow(FinalityFlow(
@@ -104,7 +105,6 @@ object RedeemFlowsK {
         }
     }
 
-    @InitiatedBy(Initiator::class)
     /**
      * When you create an initiator and an associated responder, you have no assurance that a peer will launch "your"
      * responder when you launch "your" initiator. Your peer may:
@@ -115,7 +115,7 @@ object RedeemFlowsK {
      * Additionally, when "your" responder is launched, you have no assurance that the peer that triggered the flow
      * used "your" initiator. The initiating peer may well have used a sub-class of "your" initiator.
      */
-    open class Responder(
+    abstract class Responder(
             private val counterpartySession: FlowSession,
             override val progressTracker: ProgressTracker) : FlowLogic<SignedTransaction>() {
 
@@ -141,7 +141,7 @@ object RedeemFlowsK {
          * In particular, peers will be well advised to add logic here to control whether they really want this
          * transaction to happen.
          */
-        protected open fun additionalChecks(stx: SignedTransaction) = Unit
+        protected abstract fun additionalChecks(stx: SignedTransaction)
 
         @Suspendable
         override fun call(): SignedTransaction {
@@ -154,14 +154,12 @@ object RedeemFlowsK {
                     additionalChecks(stx)
                     // Here have the checks that presumably all peers will want to have. It is opinionated and peers
                     // are free to not use this class if they want to.
-                    requireThat {
-                        // Here we only automatically check that it is technically satisfactory.
-                        // We don't like signing irrelevant transactions. I must be relevant.
-                        val relevant = stx.toLedgerTransaction(serviceHub, false)
-                                .inputsOfType<TokenStateK>()
-                                .any { it.issuer == ourIdentity || it.holder == ourIdentity }
-                        "I must be relevant." using relevant
-                    }
+                    // Here we only automatically check that it is technically satisfactory.
+                    // We don't like signing irrelevant transactions. I must be relevant.
+                    val relevant = stx.toLedgerTransaction(serviceHub, false)
+                            .inputsOfType<TokenStateK>()
+                            .any { it.issuer == ourIdentity || it.holder == ourIdentity }
+                    if (!relevant) throw FlowException("I must be relevant.")
                 }
             }
             val txId = subFlow(signTransactionFlow).id
@@ -175,32 +173,47 @@ object RedeemFlowsK {
      * This class associates a list of [TokenStateK] and the sum of their [TokenStateK.quantity]. This helps us avoid
      * constant recalculation.
      */
-    class StateAccumulator private constructor(val sum: Long, val states: List<StateAndRef<TokenStateK>>) {
+    class StateAccumulator private constructor(
+            private val maximumSum: Long,
+            val sum: Long,
+            val states: List<StateAndRef<TokenStateK>>) {
 
-        constructor(states: List<StateAndRef<TokenStateK>> = listOf()) : this(
+        constructor(maximumSum: Long, states: List<StateAndRef<TokenStateK>> = listOf()) : this(
+                maximumSum,
                 states.fold(0L) { sum, state -> Math.addExact(sum, state.state.data.quantity) },
                 states)
 
         /**
          * Joins 2 accumulators.
          */
-        fun plus(other: StateAccumulator) = StateAccumulator(
-                Math.addExact(sum, other.sum),
-                states.plus(other.states))
+        fun plus(other: StateAccumulator): StateAccumulator =
+                other.states.firstOrNull().let { first ->
+                    if (first == null) this
+                    else this
+                            .plus(first)
+                            .plus(other.minus(first))
+                }
 
         /**
-         * Add a state to the list and update the sum as we do.
+         * Add a state only if the current sum is strictly below the max sum given,
+         * and update the sum as we do.
          */
-        fun plus(state: StateAndRef<TokenStateK>) = StateAccumulator(
-                Math.addExact(sum, state.state.data.quantity),
-                states.plus(state))
+        fun plus(state: StateAndRef<TokenStateK>) =
+                if (maximumSum <= sum) this
+                else StateAccumulator(
+                        maximumSum,
+                        Math.addExact(sum, state.state.data.quantity),
+                        states.plus(state))
 
         /**
-         * Add a state only if the current sum is strictly below the max sum given.
+         * Remove a state if it is found in the list. And update the sum as we do.
          */
-        fun plusIfSumBelow(state: StateAndRef<TokenStateK>, maxSum: Long) =
-                if (maxSum <= sum) this
-                else plus(state)
+        fun minus(state: StateAndRef<TokenStateK>) =
+                if (!states.contains(state)) throw IllegalArgumentException("State not found")
+                else StateAccumulator(
+                        maximumSum,
+                        Math.subtractExact(sum, state.state.data.quantity),
+                        states.minus(state))
     }
 
     @StartableByRPC
@@ -246,7 +259,7 @@ object RedeemFlowsK {
                 paging: PageSpecification = PageSpecification(1))
                 : StateAccumulator {
             // We reached the desired state already.
-            if (remainingSum <= 0) return StateAccumulator()
+            if (remainingSum <= 0) return StateAccumulator(0L)
             val pagedStates = serviceHub.vaultService
                     .queryBy(TokenStateK::class.java, tokenCriteria, paging)
                     .states
@@ -256,13 +269,13 @@ object RedeemFlowsK {
                     // The previous query cannot pre-filter by issuer so we need to drop some here.
                     .filter { it.state.data.issuer == issuer }
                     // We will keep only up to the point where we have have enough.
-                    .fold(StateAccumulator()) { accumulator, state ->
-                        accumulator.plusIfSumBelow(state, totalQuantity)
+                    .fold(StateAccumulator(remainingSum)) { accumulator, state ->
+                        accumulator.plus(state)
                     }
             // Let's fetch some more, possibly an empty list.
             return fetched.plus(fetchWorthAtLeast(
                     // If this number is 0 or less, we will get an empty list.
-                    totalQuantity - fetched.sum,
+                    remainingSum - fetched.sum,
                     // Take the next page
                     paging.copy(pageNumber = paging.pageNumber + 1)
             ))
@@ -283,7 +296,7 @@ object RedeemFlowsK {
                     TokenStateK(issuer, ourIdentity, accumulated.sum - totalQuantity))))
 
             val toUse = if (moveTx == null) accumulated.states
-            else listOf(moveTx.toLedgerTransaction(serviceHub).outRef(0))
+            else listOf(moveTx.tx.outRef(0))
 
             progressTracker.currentStep = HANDING_TO_INITIATOR
             return Pair(moveTx, subFlow(Initiator(

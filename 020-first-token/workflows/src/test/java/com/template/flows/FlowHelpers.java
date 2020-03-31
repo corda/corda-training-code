@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
-class FlowHelpers {
+interface FlowHelpers {
 
     @NotNull
     static TokenState createFrom(
@@ -46,7 +46,7 @@ class FlowHelpers {
         }
     }
 
-    static class NodeHolding {
+    class NodeHolding {
         @NotNull
         public final StartedMockNode holder;
         public final long quantity;

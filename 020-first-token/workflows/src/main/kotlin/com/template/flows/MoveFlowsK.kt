@@ -38,12 +38,12 @@ object MoveFlowsK {
         @Suppress("ClassName")
         companion object {
             object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on parameters.")
+            object VERIFYING_TRANSACTION : ProgressTracker.Step("Verifying contract constraints.")
             object SIGNING_TRANSACTION : ProgressTracker.Step("Signing transaction with our private key.")
             object GATHERING_SIGS : ProgressTracker.Step("Gathering the counterparty's signature.") {
                 override fun childProgressTracker() = CollectSignaturesFlow.tracker()
             }
 
-            object VERIFYING_TRANSACTION : ProgressTracker.Step("Verifying contract constraints.")
             object FINALISING_TRANSACTION : ProgressTracker.Step("Obtaining notary signature and recording transaction.") {
                 override fun childProgressTracker() = FinalityFlow.tracker()
             }
@@ -67,18 +67,18 @@ object MoveFlowsK {
                     .distinct()
                     .single()
 
-            val signers = inputTokens
+            val allSigners = inputTokens
                     // Only the input holder is necessary on a Move.
                     .map { it.state.data.holder }
                     // Remove duplicates as it would be an issue when initiating flows, at least.
-                    .distinct()
-                    // We don't want to sign transactions where our signature is not needed.
-                    .also { if (!it.contains(ourIdentity)) throw FlowException("I must be a holder.") }
+                    .toSet()
+            // We don't want to sign transactions where our signature is not needed.
+            if (!allSigners.contains(ourIdentity)) throw FlowException("I must be a holder.")
 
             // The issuers and holders are required signers, so we express this here.
             val txCommand = Command(
                     Move(),
-                    signers.map { it.owningKey })
+                    allSigners.map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
             inputTokens.forEach { txBuilder.addInputState(it) }
@@ -93,7 +93,7 @@ object MoveFlowsK {
 
             progressTracker.currentStep = GATHERING_SIGS
             // We need to gather the signatures of all issuers and all holders, except ourselves.
-            val signerFlows = signers
+            val signerFlows = allSigners
                     // Remove myself.
                     .minus(ourIdentity)
                     .map { initiateFlow(it) }
@@ -112,7 +112,7 @@ object MoveFlowsK {
                     .map { it.holder }
                     .distinct()
                     // The signers are being handled in the other flows.
-                    .minus(signers)
+                    .minus(allSigners)
                     // We don't need to inform ourselves.
                     .minus(ourIdentity)
                     .map { initiateFlow(it) }

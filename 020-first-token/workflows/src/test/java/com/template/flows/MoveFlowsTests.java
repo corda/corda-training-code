@@ -111,7 +111,7 @@ public class MoveFlowsTests {
 
         // We check the recorded transaction in both transaction storages.
         for (StartedMockNode node : Arrays.asList(bob, carly)) {
-            assertEquals(tx, bob.getServices().getValidatedTransactions().getTransaction(tx.getId()));
+            assertEquals(tx, node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
         }
         for (StartedMockNode node : Arrays.asList(alice, dan)) {
             assertNull(node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
@@ -210,7 +210,7 @@ public class MoveFlowsTests {
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(expectedOutput));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-        final SignedTransaction tx = future.get();
+        future.get();
 
         // We check the states in vaults.
         assertHasStatesInVault(alice,
@@ -229,7 +229,7 @@ public class MoveFlowsTests {
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(expectedOutput));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
-        final SignedTransaction tx = future.get();
+        future.get();
 
         // We check the states in vaults.
         assertHasStatesInVault(alice,

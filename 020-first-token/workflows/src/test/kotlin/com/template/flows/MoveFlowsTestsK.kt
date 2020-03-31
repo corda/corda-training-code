@@ -88,7 +88,7 @@ class MoveFlowsTestsK {
 
         // We check the recorded transaction in both transaction storages.
         for (node in listOf(bob, carly)) {
-            assertEquals(tx, bob.services.validatedTransactions.getTransaction(tx.id))
+            assertEquals(tx, node.services.validatedTransactions.getTransaction(tx.id))
         }
         for (node in listOf(alice, dan)) {
             assertNull(node.services.validatedTransactions.getTransaction(tx.id))
@@ -191,7 +191,7 @@ class MoveFlowsTestsK {
         val flow = MoveFlowsK.Initiator(issuedTokens, listOf(expectedOutput))
         val future = bob.startFlow(flow)
         network.runNetwork()
-        val tx = future.getOrThrow()
+        future.getOrThrow()
 
         // We check the states in vaults.
         alice.assertHasStatesInVault(issuedTokens.map { it.state.data })
