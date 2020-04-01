@@ -24,17 +24,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.template.flows.MoveFlows.TransactionRole.OBSERVER;
-import static com.template.flows.MoveFlows.TransactionRole.PARTICIPANT;
-
 public interface MoveFlows {
 
     /**
      * The different transaction roles expected of the responder.
-     * A participant needs to sign, an observer only needs to receive the result.
+     * A signer needs to sign, a participant only needs to receive the result.
      */
     @CordaSerializable
-    enum TransactionRole {PARTICIPANT, OBSERVER}
+    enum TransactionRole {SIGNER, PARTICIPANT}
 
     /**
      * Started by a {@link TokenState#getHolder} to move multiple states where it is one of the holders.
@@ -158,7 +155,7 @@ public interface MoveFlows {
             // We need to use `for` instead of `.forEach` because we would need to annotate the lambda with
             // @Suspendable.
             for (final FlowSession it : signerFlows) {
-                it.send(PARTICIPANT);
+                it.send(TransactionRole.SIGNER);
             }
             final SignedTransaction fullySignedTx = signerFlows.isEmpty() ? partlySignedTx :
                     subFlow(new CollectSignaturesFlow(
@@ -179,7 +176,7 @@ public interface MoveFlows {
             // We need to use `for` instead of `.forEach` because we would need to annotate the lambda with
             // @Suspendable.
             for (final FlowSession it : newHolderFlows) {
-                it.send(OBSERVER);
+                it.send(TransactionRole.PARTICIPANT);
             }
             final List<FlowSession> allFlows = new ArrayList<>(signerFlows);
             allFlows.addAll(newHolderFlows);
@@ -242,10 +239,10 @@ public interface MoveFlows {
             final SecureHash txId;
             switch (myRole) {
                 // We do not need to sign.
-                case OBSERVER:
+                case PARTICIPANT:
                     txId = null;
                     break;
-                case PARTICIPANT: {
+                case SIGNER: {
                     final SignTransactionFlow signTransactionFlow = new SignTransactionFlow(counterpartySession) {
                         @Override
                         protected void checkTransaction(@NotNull SignedTransaction stx) throws FlowException {

@@ -18,9 +18,9 @@ object MoveFlowsK {
     @CordaSerializable
     /**
      * The different transaction roles expected of the responder.
-     * A participant needs to sign, an observer only needs to receive the result.
+     * A signer needs to sign, a participant only needs to receive the result.
      */
-    enum class TransactionRole { PARTICIPANT, OBSERVER }
+    enum class TransactionRole { SIGNER, PARTICIPANT }
 
     @InitiatingFlow
     @StartableByRPC
@@ -98,7 +98,7 @@ object MoveFlowsK {
                     .minus(ourIdentity)
                     .map { initiateFlow(it) }
                     // Prime these responders to act in a signer type of way.
-                    .onEach { it.send(TransactionRole.PARTICIPANT) }
+                    .onEach { it.send(TransactionRole.SIGNER) }
             val fullySignedTx =
                     if (signerFlows.isEmpty()) partlySignedTx
                     else subFlow(CollectSignaturesFlow(
@@ -117,7 +117,7 @@ object MoveFlowsK {
                     .minus(ourIdentity)
                     .map { initiateFlow(it) }
                     // Prime these responders to act in a holder type of way.
-                    .onEach { it.send(TransactionRole.OBSERVER) }
+                    .onEach { it.send(TransactionRole.PARTICIPANT) }
             return subFlow(FinalityFlow(
                     fullySignedTx,
                     // All of them need to finalise.
@@ -156,8 +156,8 @@ object MoveFlowsK {
             progressTracker.currentStep = SIGNING_TRANSACTION
             val txId = when (myRole) {
                 // We do not need to sign.
-                TransactionRole.OBSERVER -> null
-                TransactionRole.PARTICIPANT -> {
+                TransactionRole.PARTICIPANT -> null
+                TransactionRole.SIGNER -> {
                     val signTransactionFlow = object : SignTransactionFlow(counterpartySession) {
                         override fun checkTransaction(stx: SignedTransaction) {
                             // Notice that there is still a security risk here as my node can be asked to sign

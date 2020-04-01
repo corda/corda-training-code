@@ -76,11 +76,6 @@ object IssueFlowsK {
             val fullySignedTx = serviceHub.signInitialTransaction(txBuilder)
 
             progressTracker.currentStep = FINALISING_TRANSACTION
-            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
-            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
-            // manually.
-            serviceHub.recordTransactions(StatesToRecord.ALL_VISIBLE, listOf(fullySignedTx))
-
             val holderFlows = outputTokens
                     .map { it.holder }
                     // Remove duplicates as it would be an issue when initiating flows, at least.
@@ -94,6 +89,12 @@ object IssueFlowsK {
                     fullySignedTx,
                     holderFlows,
                     FINALISING_TRANSACTION.childProgressTracker()))
+                    .also { notarised ->
+                        // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
+                        // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
+                        // manually.
+                        serviceHub.recordTransactions(StatesToRecord.ALL_VISIBLE, listOf(notarised))
+                    }
         }
     }
 

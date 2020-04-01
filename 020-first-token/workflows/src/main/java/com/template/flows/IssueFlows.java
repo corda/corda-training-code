@@ -117,11 +117,6 @@ public interface IssueFlows {
             final SignedTransaction fullySignedTx = getServiceHub().signInitialTransaction(txBuilder);
 
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
-            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
-            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
-            // manually.
-            getServiceHub().recordTransactions(StatesToRecord.ALL_VISIBLE, ImmutableList.of(fullySignedTx));
-
             // Thanks to the Stream, we are able to have our 'final List' in one go, instead of creating a modifiable
             // one and then conditionally adding elements to it with for... add.
             final List<FlowSession> holderFlows = outputTokens.stream()
@@ -138,10 +133,18 @@ public interface IssueFlows {
                     // Get away from a Stream and back to a good ol' List.
                     .collect(Collectors.toList());
 
-            return subFlow(new FinalityFlow(
+            final SignedTransaction notarised = subFlow(new FinalityFlow(
                     fullySignedTx,
                     holderFlows,
                     FINALISING_TRANSACTION.childProgressTracker()));
+
+            // We want our issuer to have a trace of the amounts that have been issued, whether it is a holder or not,
+            // in order to know the total supply. Since the issuer is not in the participants, it needs to be done
+            // manually. We do it after the FinalityFlow as this is the better way to do, after notarisation, even if
+            // here there is no notarisation.
+            getServiceHub().recordTransactions(StatesToRecord.ALL_VISIBLE, ImmutableList.of(notarised));
+
+            return notarised;
         }
     }
 
