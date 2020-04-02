@@ -1,6 +1,13 @@
 package com.template.contracts;
 
+import com.r3.corda.lib.tokens.contracts.FungibleTokenContract;
+import com.r3.corda.lib.tokens.contracts.commands.IssueTokenCommand;
+import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
+import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
+import com.r3.corda.lib.tokens.contracts.utilities.TransactionUtilitiesKt;
+import com.template.states.AirMileType;
 import com.template.states.TokenState;
+import net.corda.core.contracts.Amount;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.testing.contracts.DummyContract;
@@ -10,6 +17,7 @@ import net.corda.testing.node.MockServices;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 
 import static com.template.contracts.TokenContract.TOKEN_CONTRACT_ID;
 import static net.corda.testing.node.NodeTestUtils.transaction;
@@ -23,11 +31,15 @@ public class TokenContractIssueTests {
     @Test
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
+            IssuedTokenType aliceMiles = new IssuedTokenType(alice, new AirMileType());
+            System.out.println("What's my hash " + TransactionUtilitiesKt.getAttachmentIdForGenericParam(aliceMiles));
+            tx.output(
+                    FungibleTokenContract.Companion.getContractId(),
+                    new FungibleToken(new Amount<>(10L, aliceMiles), bob, TransactionUtilitiesKt.getAttachmentIdForGenericParam(aliceMiles)));
             // Let's add a command from an unrelated dummy contract.
             tx.command(alice.getOwningKey(), new DummyContract.Commands.Create());
             tx.failsWith("Required com.template.contracts.TokenContract.Commands command");
-            tx.command(alice.getOwningKey(), new TokenContract.Commands.Issue());
+            tx.command(alice.getOwningKey(), new IssueTokenCommand(aliceMiles, Collections.singletonList(0)));
             tx.verifies();
             return null;
         });
