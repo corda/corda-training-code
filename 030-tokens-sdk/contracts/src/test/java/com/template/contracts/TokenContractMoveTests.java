@@ -1,34 +1,58 @@
 package com.template.contracts;
 
-import com.template.states.TokenState;
+import com.google.common.collect.ImmutableList;
+import com.r3.corda.lib.tokens.contracts.FungibleTokenContract;
+import com.r3.corda.lib.tokens.contracts.commands.MoveTokenCommand;
+import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
+import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
+import com.template.states.AirMileType;
 import kotlin.NotImplementedError;
+import net.corda.core.contracts.Amount;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.testing.contracts.DummyContract;
 import net.corda.testing.core.TestIdentity;
 import net.corda.testing.node.MockServices;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 
-import static com.template.contracts.TokenContract.TOKEN_CONTRACT_ID;
 import static net.corda.testing.node.NodeTestUtils.transaction;
 import static org.junit.Assert.assertEquals;
 
 public class TokenContractMoveTests {
-    private final MockServices ledgerServices = new MockServices();
+    private final MockServices ledgerServices = new MockServices(ImmutableList.of(
+            "com.template.contracts",
+            "com.r3.corda.lib.tokens.contracts"));
     private final Party alice = new TestIdentity(new CordaX500Name("Alice", "London", "GB")).getParty();
     private final Party bob = new TestIdentity(new CordaX500Name("Bob", "New York", "US")).getParty();
     private final Party carly = new TestIdentity(new CordaX500Name("Carly", "New York", "US")).getParty();
+    private final IssuedTokenType aliceMile = new IssuedTokenType(alice, AirMileType.create());
+    private final IssuedTokenType carlyMile = new IssuedTokenType(carly, AirMileType.create());
+
+    @NotNull
+    private FungibleToken create(
+            @NotNull final IssuedTokenType tokenType,
+            @NotNull final Party holder,
+            final long quantity) {
+        return new FungibleToken(new Amount<>(quantity, tokenType), holder, null);
+    }
 
     @Test
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.command(alice.getOwningKey(), new DummyContract.Commands.Create());
-            tx.failsWith("Required com.template.contracts.TokenContract.Commands command");
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.tweak(txCopy -> {
+                txCopy.command(alice.getOwningKey(), new DummyContract.Commands.Create());
+                txCopy.failsWith("There must be at least one token command in this transaction");
+                return null;
+            });
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
             tx.verifies();
             return null;
         });
@@ -37,9 +61,18 @@ public class TokenContractMoveTests {
     @Test
     public void moveTransactionMustHaveInputs() {
         transaction(ledgerServices, tx -> {
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, carly, 10L));
-            tx.command(alice.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("There should be tokens to move.");
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.tweak(txCopy -> {
+                txCopy.command(
+                        carly.getOwningKey(),
+                        new MoveTokenCommand(aliceMile, Collections.emptyList(), Collections.singletonList(0)));
+                txCopy.failsWith("When moving tokens, there must be input states present");
+                return null;
+            });
+            tx.command(
+                    carly.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 10L));
             return null;
         });
     }
@@ -47,37 +80,54 @@ public class TokenContractMoveTests {
     @Test
     public void moveTransactionMustHaveOutputs() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("There should be moved tokens.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.tweak(txCopy -> {
+                txCopy.command(
+                        bob.getOwningKey(),
+                        new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.emptyList()));
+                txCopy.failsWith("When moving tokens, there must be output states present");
+                return null;
+            });
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 10L));
+            tx.verifies();
             return null;
         });
     }
 
     @Test
-    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
-    // let that happen.
-    public void inputsMustNotHaveAZeroQuantity() {
+    public void inputsMayHaveAZeroQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 0L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("All quantities must be above 0.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 0L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Collections.singletonList(0)));
+            tx.verifies();
             return null;
         });
     }
 
     @Test
-    // Testing this may be redundant as these wrong states would have to be issued first, but the contract would not
-    // let that happen.
-    public void inputsMustNotHaveNegativeQuantity() {
+    public void inputsMustBeAccountedForInCommand() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, -1L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 9L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("All quantities must be above 0.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 1L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 11L));
+            tx.tweak(txCopy -> {
+                txCopy.command(
+                        bob.getOwningKey(),
+                        new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
+                txCopy.failsWith("There is a token group with no assigned command");
+                return null;
+            });
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Collections.singletonList(0)));
+            tx.verifies();
             return null;
         });
     }
@@ -85,23 +135,33 @@ public class TokenContractMoveTests {
     @Test
     public void outputsMustNotHaveAZeroQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, carly, 0L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("All quantities must be above 0.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 0L));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Collections.singletonList(0), Arrays.asList(0, 1)));
+            tx.failsWith("You cannot create output token amounts with a ZERO amount");
             return null;
         });
     }
 
     @Test
-    public void outputsMustNotHaveNegativeQuantity() {
+    public void outputsMustBeAccountedForInCommand() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 11L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, carly, -1L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("All quantities must be above 0.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 11L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 1L));
+            tx.tweak(txCopy -> {
+                txCopy.command(
+                        bob.getOwningKey(),
+                        new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
+                txCopy.failsWith("There is a token group with no assigned command");
+                return null;
+            });
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Collections.singletonList(0), Arrays.asList(0, 1)));
             return null;
         });
     }
@@ -109,10 +169,12 @@ public class TokenContractMoveTests {
     @Test
     public void issuerMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly, bob, 10L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("Consumed and created issuers should be identical.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(carlyMile, bob, 10L));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
+            tx.failsWith("There is a token group with no assigned command");
             return null;
         });
     }
@@ -120,11 +182,16 @@ public class TokenContractMoveTests {
     @Test
     public void allIssuersMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly, bob, 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 20L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("Consumed and created issuers should be identical.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(carlyMile, bob, 10L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 20L));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(carlyMile, Collections.singletonList(1), Collections.emptyList()));
+            tx.failsWith("In move groups the amount of input tokens MUST EQUAL the amount of output tokens");
             return null;
         });
     }
@@ -132,11 +199,21 @@ public class TokenContractMoveTests {
     @Test
     public void sumMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 15L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 20L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("The sum of quantities for each issuer should be conserved.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 15L));
+            tx.tweak(txCopy -> {
+                txCopy.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 20L));
+                txCopy.command(
+                        bob.getOwningKey(),
+                        new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Collections.singletonList(0)));
+                txCopy.failsWith("In move groups the amount of input tokens MUST EQUAL the amount of output tokens");
+                return null;
+            });
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 25L));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Collections.singletonList(0)));
+            tx.verifies();
             return null;
         });
     }
@@ -144,14 +221,19 @@ public class TokenContractMoveTests {
     @Test
     public void allSumsPerIssuerMustBeConservedInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 15L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 20L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly, bob, 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly, bob, 15L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly, bob, 30L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("The sum of quantities for each issuer should be conserved.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 15L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 20L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(carlyMile, bob, 10L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(carlyMile, bob, 15L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(carlyMile, bob, 30L));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Collections.singletonList(0)));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(carlyMile, Arrays.asList(2, 3), Collections.singletonList(1)));
+            tx.failsWith("In move groups the amount of input tokens MUST EQUAL the amount of output tokens");
             return null;
         });
     }
@@ -160,11 +242,13 @@ public class TokenContractMoveTests {
     public void sumsThatResultInOverflowAreNotPossibleInMoveTransaction() {
         try {
             transaction(ledgerServices, tx -> {
-                tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, Long.MAX_VALUE));
-                tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, carly, 1L));
-                tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 1L));
-                tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, carly, Long.MAX_VALUE));
-                tx.command(Arrays.asList(bob.getOwningKey(), carly.getOwningKey()), new TokenContract.Commands.Move());
+                tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, Long.MAX_VALUE));
+                tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 1L));
+                tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 1L));
+                tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, Long.MAX_VALUE));
+                tx.command(
+                        Arrays.asList(bob.getOwningKey(), carly.getOwningKey()),
+                        new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Arrays.asList(0, 1)));
                 tx.failsWith("The sum of quantities for each issuer should be conserved.");
                 return null;
             });
@@ -177,10 +261,19 @@ public class TokenContractMoveTests {
     @Test
     public void currentHolderMustSignMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, carly, 10L));
-            tx.command(alice.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("The current holders should sign.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 10L));
+            tx.tweak(txCopy -> {
+                txCopy.command(
+                        alice.getOwningKey(),
+                        new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
+                txCopy.failsWith("Required signers does not contain all the current owners of the tokens being moved");
+                return null;
+            });
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Collections.singletonList(0), Collections.singletonList(0)));
+            tx.verifies();
             return null;
         });
     }
@@ -188,11 +281,20 @@ public class TokenContractMoveTests {
     @Test
     public void allCurrentHoldersMustSignMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, carly, 20L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, carly, 30L));
-            tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("The current holders should sign.");
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 20L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 30L));
+            tx.tweak(txCopy -> {
+                txCopy.command(
+                        bob.getOwningKey(),
+                        new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Collections.singletonList(0)));
+                txCopy.failsWith("Required signers does not contain all the current owners of the tokens being moved");
+                return null;
+            });
+            tx.command(
+                    Arrays.asList(bob.getOwningKey(), carly.getOwningKey()),
+                    new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Collections.singletonList(0)));
+            tx.verifies();
             return null;
         });
     }
@@ -200,15 +302,20 @@ public class TokenContractMoveTests {
     @Test
     public void canHaveDifferentIssuersInMoveTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 20L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, alice, 5L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 5L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, carly, 20L));
-            tx.input(TOKEN_CONTRACT_ID, new TokenState(carly, carly, 40L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly, alice, 20L));
-            tx.output(TOKEN_CONTRACT_ID, new TokenState(carly, bob, 20L));
-            tx.command(Arrays.asList(bob.getOwningKey(), carly.getOwningKey()), new TokenContract.Commands.Move());
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 20L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, alice, 5L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 5L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 20L));
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(carlyMile, carly, 40L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(carlyMile, alice, 20L));
+            tx.output(FungibleTokenContract.Companion.getContractId(), create(carlyMile, bob, 20L));
+            tx.command(
+                    bob.getOwningKey(),
+                    new MoveTokenCommand(aliceMile, Arrays.asList(0, 1), Arrays.asList(0, 1, 2)));
+            tx.command(
+                    carly.getOwningKey(),
+                    new MoveTokenCommand(carlyMile, Collections.singletonList(2), Arrays.asList(3, 4)));
             tx.verifies();
             return null;
         });
