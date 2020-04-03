@@ -8,7 +8,6 @@ import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
-import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokensHandler;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.MoveFungibleTokens;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.RedeemFungibleTokens;
 import com.r3.corda.lib.tokens.workflows.types.PartyAndAmount;
@@ -24,9 +23,10 @@ import net.corda.core.node.services.vault.QueryCriteria;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.*;
 import org.jetbrains.annotations.NotNull;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -35,16 +35,39 @@ import static org.junit.Assert.assertEquals;
 public class TokenCourseExercise {
     private static final CordaX500Name US_MINT = CordaX500Name.parse("O=US Mint, L=Washington D.C., C=US");
     private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
-            .withCordappsForAllNodes(ImmutableList.of(TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"))));
+            .withCordappsForAllNodes(ImmutableList.of(
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.money"),
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.selection"),
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"),
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"))));
     private final StartedMockNode usMint = network.createNode(new MockNodeParameters()
             .withLegalName(US_MINT));
     private final StartedMockNode alice = network.createNode();
     private final StartedMockNode bob = network.createNode();
 
     public TokenCourseExercise() {
-        Arrays.asList(alice, bob).forEach(it ->
-                it.registerInitiatedFlow(IssueTokensHandler.class));
+    }
 
+    @Before
+    public void setup() {
+        network.runNetwork();
+    }
+
+    @After
+    public void tearDown() {
+        network.stopNodes();
+    }
+
+    @NotNull
+    private FungibleToken createUsdFungible(
+            @NotNull final StartedMockNode issuer,
+            @NotNull final StartedMockNode holder,
+            final long quantity) {
+        final TokenType usdType = new TokenType("USD", 2);
+        final IssuedTokenType issued = new IssuedTokenType(issuer.getInfo().getLegalIdentities().get(0), usdType);
+        final Amount<IssuedTokenType> amount = AmountUtilitiesKt.amount(quantity, issued);
+        return new FungibleToken(amount, holder.getInfo().getLegalIdentities().get(0), null);
     }
 
     private static class IssueUsdFlow extends FlowLogic<SignedTransaction> {
@@ -65,11 +88,16 @@ public class TokenCourseExercise {
                 throw new FlowException("We are not the US Mint");
             }
             final IssuedTokenType usMintUsd = new IssuedTokenType(getOurIdentity(), usdTokenType);
+
+            // Who is going to own the output, and how much?
+            // Create a 100$ token that can be split and merged.
             final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(amount, usMintUsd);
             final FungibleToken usdToken = new FungibleToken(amountOfUsd, alice, null);
+
+            // Issue the token to alice.
             return subFlow(new IssueTokens(
-                    Collections.singletonList(usdToken),
-                    Collections.emptyList()));
+                    Collections.singletonList(usdToken), // Output instances
+                    Collections.emptyList())); // Observers
         }
     }
 
@@ -86,18 +114,25 @@ public class TokenCourseExercise {
         @Override
         @Suspendable
         public SignedTransaction call() throws FlowException {
+            // Prepare what we are talking about.
             final TokenType usdTokenType = FiatCurrency.Companion.getInstance("USD");
             final Party usMint = getServiceHub().getNetworkMapCache().getPeerByLegalName(US_MINT);
             if (usMint == null) throw new FlowException("No US Mint found");
-            final QueryCriteria issuedByUSMint = QueryUtilitiesKt.tokenAmountWithIssuerCriteria(usdTokenType, usMint);
-            final QueryCriteria heldByMe = QueryUtilitiesKt.heldTokenAmountCriteria(usdTokenType, getOurIdentity());
+
+            // Who is going to own the output, and how much?
             final Amount<TokenType> usdAmount = AmountUtilitiesKt.amount(amount, usdTokenType);
             final PartyAndAmount<TokenType> bobsAmount = new PartyAndAmount<>(bob, usdAmount);
+
+            // Describe how to find those $ held by Me.
+            final QueryCriteria issuedByUSMint = QueryUtilitiesKt.tokenAmountWithIssuerCriteria(usdTokenType, usMint);
+            final QueryCriteria heldByMe = QueryUtilitiesKt.heldTokenAmountCriteria(usdTokenType, getOurIdentity());
+
+            // Do the move
             return subFlow(new MoveFungibleTokens(
-                    Collections.singletonList(bobsAmount),
-                    Collections.emptyList(),
-                    issuedByUSMint.and(heldByMe),
-                    getOurIdentity()));
+                    Collections.singletonList(bobsAmount), // Output instances
+                    Collections.emptyList(), // Observers
+                    issuedByUSMint.and(heldByMe), // Criteria to find the inputs
+                    getOurIdentity())); // change holder
         }
     }
 
@@ -114,13 +149,18 @@ public class TokenCourseExercise {
             final TokenType usdTokenType = FiatCurrency.Companion.getInstance("USD");
             final Party usMint = getServiceHub().getNetworkMapCache().getPeerByLegalName(US_MINT);
             if (usMint == null) throw new FlowException("No US Mint found");
+
+            // Describe how to find those $ held by Me.
             final QueryCriteria heldByMe = QueryUtilitiesKt.heldTokenAmountCriteria(usdTokenType, getOurIdentity());
             final Amount<TokenType> usdAmount = AmountUtilitiesKt.amount(amount, usdTokenType);
+
+            // Do the redeem
             return subFlow(new RedeemFungibleTokens(
-                    usdAmount,
-                    usMint,
-                    Collections.emptyList(),
-                    heldByMe));
+                    usdAmount, // How much to redeem
+                    usMint, // issuer
+                    Collections.emptyList(), // Observers
+                    heldByMe, // Criteria to find the inputs
+                    getOurIdentity())); // change holder
         }
     }
 
@@ -153,9 +193,12 @@ public class TokenCourseExercise {
         mintIssues100ToAlice();
 
         // Alice has the tokens
-        final List<StateAndRef<FungibleToken>> states = alice.getServices().getVaultService()
+        final List<StateAndRef<FungibleToken>> aliceStates = alice.getServices().getVaultService()
                 .queryBy(FungibleToken.class).getStates();
-        assertEquals(1, states.size());
+        assertEquals(1, aliceStates.size());
+        final FungibleToken aliceToken = aliceStates.get(0).getState().getData();
+        assertEquals(createUsdFungible(usMint, alice, 100L), aliceToken);
+
     }
 
     @Test
@@ -167,11 +210,15 @@ public class TokenCourseExercise {
         final List<StateAndRef<FungibleToken>> aliceStates = alice.getServices().getVaultService()
                 .queryBy(FungibleToken.class).getStates();
         assertEquals(1, aliceStates.size());
+        final FungibleToken aliceToken = aliceStates.get(0).getState().getData();
+        assertEquals(createUsdFungible(usMint, alice, 50L), aliceToken);
 
         // Bob has tokens
         final List<StateAndRef<FungibleToken>> bobStates = bob.getServices().getVaultService()
                 .queryBy(FungibleToken.class).getStates();
         assertEquals(1, bobStates.size());
+        final FungibleToken bobToken = bobStates.get(0).getState().getData();
+        assertEquals(createUsdFungible(usMint, bob, 50L), bobToken);
     }
 
     @Test
@@ -184,11 +231,13 @@ public class TokenCourseExercise {
         final List<StateAndRef<FungibleToken>> bobStates = bob.getServices().getVaultService()
                 .queryBy(FungibleToken.class).getStates();
         assertEquals(1, bobStates.size());
+        final FungibleToken bobToken = bobStates.get(0).getState().getData();
+        assertEquals(createUsdFungible(usMint, bob, 25L), bobToken);
 
         // UsMint has tokens
         final List<StateAndRef<FungibleToken>> mintStates = usMint.getServices().getVaultService()
                 .queryBy(FungibleToken.class).getStates();
-        assertEquals(2, mintStates.size());
+        assertEquals(0, mintStates.size());
     }
 
 }

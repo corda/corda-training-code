@@ -64,6 +64,7 @@ dependencies {
     // CorDapp dependencies.
     cordapp "$tokens_release_group:tokens-workflows:$tokens_release_version"
     cordapp "$tokens_release_group:tokens-selection:$tokens_release_version"
+    cordapp "$confidential_id_release_group:ci-workflows:$confidential_id_release_version"
     cordapp project(":contracts")
 }
 

@@ -21,6 +21,8 @@ buildscript {
         spring_boot_gradle_plugin_version = '2.0.2.RELEASE'
         tokens_release_version = constants.getProperty("tokensReleaseVersion")
         tokens_release_group = constants.getProperty("tokensReleaseGroup")
+        confidential_id_release_version = constants.getProperty("confidentialIdReleaseVersion")
+        confidential_id_release_group = constants.getProperty("confidentialIdReleaseGroup")
     }
 
     repositories {
