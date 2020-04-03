@@ -37,9 +37,6 @@ public class TokenCourseExercise {
     private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
             .withCordappsForAllNodes(ImmutableList.of(
                     TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.money"),
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.selection"),
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"),
                     TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"))));
     private final StartedMockNode usMint = network.createNode(new MockNodeParameters()
             .withLegalName(US_MINT));
