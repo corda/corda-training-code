@@ -1,10 +1,13 @@
 package com.template.flows;
 
-import com.template.states.TokenState;
+import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
+import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
+import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
+import com.template.states.AirMileType;
 import javafx.util.Pair;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
-import net.corda.core.identity.Party;
+import net.corda.core.identity.AbstractParty;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.MockNetwork;
 import net.corda.testing.node.StartedMockNode;
@@ -19,26 +22,28 @@ import static org.junit.Assert.assertEquals;
 interface FlowHelpers {
 
     @NotNull
-    static TokenState createFrom(
+    static FungibleToken createFrom(
             @NotNull final StartedMockNode issuer,
             @NotNull final StartedMockNode holder,
             final long quantity) {
-        return new TokenState(
-                issuer.getInfo().getLegalIdentities().get(0),
+        return new FungibleToken(
+                AmountUtilitiesKt.amount(
+                        quantity,
+                        new IssuedTokenType(issuer.getInfo().getLegalIdentities().get(0), AirMileType.create())),
                 holder.getInfo().getLegalIdentities().get(0),
-                quantity);
+                null);
     }
 
     @NotNull
-    static Pair<Party, Long> toPair(@NotNull final TokenState token) {
-        return new Pair<>(token.getHolder(), token.getQuantity());
+    static Pair<AbstractParty, Long> toPair(@NotNull final FungibleToken token) {
+        return new Pair<>(token.getHolder(), token.getAmount().getQuantity());
     }
 
     static void assertHasStatesInVault(
             @NotNull final StartedMockNode node,
-            @NotNull final List<TokenState> tokenStates) {
-        final List<StateAndRef<TokenState>> vaultTokens = node.transaction(() ->
-                node.getServices().getVaultService().queryBy(TokenState.class).getStates());
+            @NotNull final List<FungibleToken> tokenStates) {
+        final List<StateAndRef<FungibleToken>> vaultTokens = node.transaction(() ->
+                node.getServices().getVaultService().queryBy(FungibleToken.class).getStates());
         assertEquals(tokenStates.size(), vaultTokens.size());
         for (int i = 0; i < tokenStates.size(); i++) {
             // The equals and hashcode functions are implemented correctly.
@@ -57,13 +62,13 @@ interface FlowHelpers {
         }
 
         @NotNull
-        public Pair<Party, Long> toPair() {
+        public Pair<AbstractParty, Long> toPair() {
             return new Pair<>(holder.getInfo().getLegalIdentities().get(0), quantity);
         }
     }
 
     @NotNull
-    static List<StateAndRef<TokenState>> issueTokens(
+    static List<StateAndRef<FungibleToken>> issueTokens(
             @NotNull final StartedMockNode node,
             @NotNull final MockNetwork network,
             @NotNull final Collection<NodeHolding> nodeHoldings)
@@ -75,7 +80,7 @@ interface FlowHelpers {
         network.runNetwork();
         final SignedTransaction tx = future.get();
         return tx.toLedgerTransaction(node.getServices())
-                .outRefsOfType(TokenState.class);
+                .outRefsOfType(FungibleToken.class);
     }
 
 }

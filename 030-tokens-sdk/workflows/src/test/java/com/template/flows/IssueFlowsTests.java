@@ -1,7 +1,7 @@
 package com.template.flows;
 
 import com.google.common.collect.ImmutableList;
-import com.template.states.TokenState;
+import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import javafx.util.Pair;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.ContractState;
@@ -12,7 +12,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -23,8 +22,9 @@ public class IssueFlowsTests {
     private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
             .withNotarySpecs(ImmutableList.of(new MockNetworkNotarySpec(Constants.desiredNotary)))
             .withCordappsForAllNodes(ImmutableList.of(
-                    TestCordapp.findCordapp("com.template.contracts"),
-                    TestCordapp.findCordapp("com.template.flows"))
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
+                    TestCordapp.findCordapp("com.template.flows"),
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"))
             ));
     private final StartedMockNode alice = network.createNode();
     private final StartedMockNode bob = network.createNode();
@@ -32,8 +32,6 @@ public class IssueFlowsTests {
     private final StartedMockNode dan = network.createNode();
 
     public IssueFlowsTests() {
-        Arrays.asList(alice, bob, carly, dan).forEach(it ->
-                it.registerInitiatedFlow(IssueFlows.Responder.class));
     }
 
     @Before
@@ -44,6 +42,17 @@ public class IssueFlowsTests {
     @After
     public void tearDown() {
         network.stopNodes();
+    }
+
+    @Test
+    public void signedTransactionPickedThePreferredNotary() throws Exception {
+        final IssueFlows.Initiator flow = new IssueFlows.Initiator(bob.getInfo().getLegalIdentities().get(0), 10L);
+        final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
+        network.runNetwork();
+
+        final SignedTransaction tx = future.get();
+        //noinspection ConstantConditions
+        assertEquals(Constants.desiredNotary, tx.getNotary().getName());
     }
 
     @Test
@@ -89,10 +98,11 @@ public class IssueFlowsTests {
     }
 
     @Test
-    public void recordedTransactionHasNoInputsAndASingleOutputTheTokenState() throws Exception {
-        final TokenState expected = createFrom(alice, bob, 10L);
+    public void recordedTransactionHasNoInputsAndASingleOutputTheFungibleToken() throws Exception {
+        final FungibleToken expected = createFrom(alice, bob, 10L);
 
-        final IssueFlows.Initiator flow = new IssueFlows.Initiator(expected.getHolder(), expected.getQuantity());
+        final IssueFlows.Initiator flow = new IssueFlows.Initiator(
+                expected.getHolder(), expected.getAmount().getQuantity());
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
         final SignedTransaction tx = future.get();
@@ -110,9 +120,10 @@ public class IssueFlowsTests {
 
     @Test
     public void thereIs1CorrectRecordedState() throws Exception {
-        final TokenState expected = createFrom(alice, bob, 10L);
+        final FungibleToken expected = createFrom(alice, bob, 10L);
 
-        final IssueFlows.Initiator flow = new IssueFlows.Initiator(expected.getHolder(), expected.getQuantity());
+        final IssueFlows.Initiator flow = new IssueFlows.Initiator(
+                expected.getHolder(), expected.getAmount().getQuantity());
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
         future.get();
@@ -123,9 +134,9 @@ public class IssueFlowsTests {
     }
 
     @Test
-    public void recordedTransactionHasNoInputsAndManyOutputsTheTokenStates() throws Exception {
-        final TokenState expected1 = createFrom(alice, bob, 10L);
-        final TokenState expected2 = createFrom(alice, carly, 20L);
+    public void recordedTransactionHasNoInputsAndManyOutputsTheFungibleTokens() throws Exception {
+        final FungibleToken expected1 = createFrom(alice, bob, 10L);
+        final FungibleToken expected2 = createFrom(alice, carly, 20L);
 
         final IssueFlows.Initiator flow = new IssueFlows.Initiator(ImmutableList.of(
                 toPair(expected1),
@@ -148,8 +159,8 @@ public class IssueFlowsTests {
 
     @Test
     public void thereAre2CorrectStatesRecordedByRelevance() throws Exception {
-        final TokenState expected1 = createFrom(alice, bob, 10L);
-        final TokenState expected2 = createFrom(alice, carly, 20L);
+        final FungibleToken expected1 = createFrom(alice, bob, 10L);
+        final FungibleToken expected2 = createFrom(alice, carly, 20L);
 
         final IssueFlows.Initiator flow = new IssueFlows.Initiator(ImmutableList.of(
                 toPair(expected1),
@@ -167,9 +178,9 @@ public class IssueFlowsTests {
     }
 
     @Test
-    public void recordedTransactionHasNoInputsAnd2OutputsOfSameHolderTheTokenStates() throws Exception {
-        final TokenState expected1 = createFrom(alice, bob, 10L);
-        final TokenState expected2 = createFrom(alice, bob, 20L);
+    public void recordedTransactionHasNoInputsAnd2OutputsOfSameHolderTheFungibleTokens() throws Exception {
+        final FungibleToken expected1 = createFrom(alice, bob, 10L);
+        final FungibleToken expected2 = createFrom(alice, bob, 20L);
 
         final IssueFlows.Initiator flow = new IssueFlows.Initiator(ImmutableList.of(
                 toPair(expected1),
@@ -192,8 +203,8 @@ public class IssueFlowsTests {
 
     @Test
     public void thereAre2CorrectRecordedStatesAgain() throws Exception {
-        final TokenState expected1 = createFrom(alice, bob, 10L);
-        final TokenState expected2 = createFrom(alice, bob, 20L);
+        final FungibleToken expected1 = createFrom(alice, bob, 10L);
+        final FungibleToken expected2 = createFrom(alice, bob, 20L);
 
         final IssueFlows.Initiator flow = new IssueFlows.Initiator(ImmutableList.of(
                 toPair(expected1),

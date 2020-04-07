@@ -1,8 +1,9 @@
 package com.template.flows;
 
 import com.google.common.collect.ImmutableList;
+import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
+import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensFlowHandler;
 import com.template.flows.MoveFlows.Initiator;
-import com.template.states.TokenState;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.*;
 import net.corda.core.flows.FlowException;
@@ -26,18 +27,17 @@ public class MoveFlowsTests {
     private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
             .withNotarySpecs(ImmutableList.of(new MockNetworkNotarySpec(Constants.desiredNotary)))
             .withCordappsForAllNodes(Arrays.asList(
-                    TestCordapp.findCordapp("com.template.contracts"),
-                    TestCordapp.findCordapp("com.template.flows"))));
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
+                    TestCordapp.findCordapp("com.template.flows"),
+                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"))));
     private final StartedMockNode alice = network.createNode();
     private final StartedMockNode bob = network.createNode();
     private final StartedMockNode carly = network.createNode();
     private final StartedMockNode dan = network.createNode();
 
     public MoveFlowsTests() {
-        Arrays.asList(alice, bob, carly, dan).forEach(it -> {
-            it.registerInitiatedFlow(IssueFlows.Responder.class);
-            it.registerInitiatedFlow(MoveFlows.Initiator.class, MoveFlows.Responder.class);
-        });
+        Arrays.asList(alice, bob, carly, dan).forEach(it ->
+                it.registerInitiatedFlow(Initiator.class, MoveTokensFlowHandler.class));
     }
 
     @Before
@@ -52,7 +52,7 @@ public class MoveFlowsTests {
 
     @Test(expected = FlowException.class)
     public void flowFailsWhenInitiatorIsMissingTransactionsTheyWereNotPartyTo() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(
                 alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
         issuedTokens.addAll(issueTokens(
                 carly, network, Collections.singletonList(new FlowHelpers.NodeHolding(dan, 20L))));
@@ -71,7 +71,7 @@ public class MoveFlowsTests {
 
     @Test
     public void SignedTransactionReturnedByTheFlowIsSignedByTheHolder() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(
                 alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(
@@ -86,7 +86,7 @@ public class MoveFlowsTests {
 
     @Test
     public void SignedTransactionReturnedByTheFlowIsSignedByBothHoldersSameIssuer() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(alice, network, Arrays.asList(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
                 new FlowHelpers.NodeHolding(bob, 10L),
                 new FlowHelpers.NodeHolding(carly, 20L)));
 
@@ -100,7 +100,7 @@ public class MoveFlowsTests {
 
     @Test
     public void flowRecordsATransactionInHolderTransactionStoragesOnly() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
                 new FlowHelpers.NodeHolding(bob, 10L)));
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(
@@ -120,7 +120,7 @@ public class MoveFlowsTests {
 
     @Test
     public void flowRecordsATransactionInBothHoldersTransactionStoragesSameIssuer() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(alice, network, Arrays.asList(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
                 new FlowHelpers.NodeHolding(bob, 10L),
                 new FlowHelpers.NodeHolding(carly, 20L)));
 
@@ -139,10 +139,10 @@ public class MoveFlowsTests {
 
     @Test
     public void recordedTransactionHasASingleInputAndASingleOutput() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
                 new FlowHelpers.NodeHolding(bob, 10L)));
-        final TokenState expectedInput = issuedTokens.get(0).getState().getData();
-        final TokenState expectedOutput = createFrom(alice, carly, 10L);
+        final FungibleToken expectedInput = issuedTokens.get(0).getState().getData();
+        final FungibleToken expectedOutput = createFrom(alice, carly, 10L);
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(expectedOutput));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
@@ -167,13 +167,13 @@ public class MoveFlowsTests {
 
     @Test
     public void recordedTransactionHasTwoInputsAnd1OutputSameIssuer() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(alice, network, Arrays.asList(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
                 new FlowHelpers.NodeHolding(bob, 10L),
                 new FlowHelpers.NodeHolding(carly, 20L)));
-        final List<TokenState> expectedInputs = issuedTokens.stream()
+        final List<FungibleToken> expectedInputs = issuedTokens.stream()
                 .map(it -> it.getState().getData())
                 .collect(Collectors.toList());
-        final TokenState expectedOutput = createFrom(alice, dan, 30L);
+        final FungibleToken expectedOutput = createFrom(alice, dan, 30L);
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(expectedOutput));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
@@ -203,9 +203,9 @@ public class MoveFlowsTests {
 
     @Test
     public void thereIsOneRecordedStateAfterMoveOnlyInRecipientIssuerKeepsOldState() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
                 new FlowHelpers.NodeHolding(bob, 10L)));
-        final TokenState expectedOutput = createFrom(alice, carly, 10L);
+        final FungibleToken expectedOutput = createFrom(alice, carly, 10L);
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(expectedOutput));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
@@ -221,10 +221,10 @@ public class MoveFlowsTests {
 
     @Test
     public void thereIsOneRecordedStateAfterMoveOnlyInRecipientSameIssuerIssuerKeepsOldStates() throws Throwable {
-        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(alice, network, Arrays.asList(
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
                 new FlowHelpers.NodeHolding(bob, 10L),
                 new FlowHelpers.NodeHolding(carly, 20L)));
-        final TokenState expectedOutput = createFrom(alice, dan, 30L);
+        final FungibleToken expectedOutput = createFrom(alice, dan, 30L);
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(expectedOutput));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
