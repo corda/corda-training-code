@@ -5,10 +5,8 @@ import com.r3.corda.lib.tokens.contracts.FungibleTokenContract;
 import com.r3.corda.lib.tokens.contracts.commands.IssueTokenCommand;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
-import com.r3.corda.lib.tokens.contracts.utilities.TransactionUtilitiesKt;
 import com.template.states.AirMileType;
 import net.corda.core.contracts.Amount;
-import net.corda.core.crypto.SecureHash;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.testing.contracts.DummyContract;
@@ -35,17 +33,11 @@ public class TokenContractIssueTests {
     private final IssuedTokenType carlyMile = new IssuedTokenType(carly, new AirMileType());
 
     @NotNull
-    private static SecureHash getContractAttachment() {
-        //noinspection ConstantConditions
-        return TransactionUtilitiesKt.getAttachmentIdForGenericParam(new AirMileType());
-    }
-
-    @NotNull
     private FungibleToken create(
             @NotNull final IssuedTokenType tokenType,
             @NotNull final Party holder,
             final long quantity) {
-        return new FungibleToken(new Amount<>(quantity, tokenType), holder, getContractAttachment());
+        return new FungibleToken(new Amount<>(quantity, tokenType), holder, AirMileType.getContractAttachment());
     }
 
     @Test
@@ -55,7 +47,7 @@ public class TokenContractIssueTests {
             tx.command(alice.getOwningKey(), new IssueTokenCommand(aliceMile, Collections.singletonList(0)));
             tx.failsWith("Contract verification failed: Expected to find type jar");
 
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.verifies();
             return null;
         });
@@ -64,7 +56,7 @@ public class TokenContractIssueTests {
     @Test
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.tweak(txCopy -> {
                 // Let's add a command from an unrelated dummy contract.
@@ -81,7 +73,7 @@ public class TokenContractIssueTests {
     @Test
     public void issueTransactionMustHaveNoInputs() {
         transaction(ledgerServices, tx -> {
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.command(alice.getOwningKey(), new IssueTokenCommand(aliceMile, Collections.singletonList(0)));
             tx.tweak(txCopy -> {
@@ -97,7 +89,7 @@ public class TokenContractIssueTests {
     @Test
     public void issueTransactionCanHaveNoOutputs() {
         transaction(ledgerServices, tx -> {
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.output(FungibleTokenContract.Companion.getContractId(), new DummyState());
             tx.command(alice.getOwningKey(), new IssueTokenCommand(aliceMile, Collections.singletonList(0)));
             tx.verifies();
@@ -108,7 +100,7 @@ public class TokenContractIssueTests {
     @Test
     public void outputsMustNotHaveAZeroQuantity() {
         transaction(ledgerServices, tx -> {
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.tweak(txCopy -> {
                 txCopy.command(alice.getOwningKey(), new IssueTokenCommand(aliceMile, Arrays.asList(0, 1)));
@@ -125,7 +117,7 @@ public class TokenContractIssueTests {
     @Test
     public void outputsMustBeAccountedForInCommand() {
         transaction(ledgerServices, tx -> {
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 15L));
             tx.tweak(txCopy -> {
@@ -142,7 +134,7 @@ public class TokenContractIssueTests {
     @Test
     public void issuerMustSignIssueTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.tweak(txCopy -> {
                 txCopy.command(bob.getOwningKey(), new IssueTokenCommand(aliceMile, Collections.singletonList(0)));
@@ -158,7 +150,7 @@ public class TokenContractIssueTests {
     @Test
     public void allIssuersMustSignIssueTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.output(FungibleTokenContract.Companion.getContractId(), create(carlyMile, bob, 20L));
             tx.command(alice.getOwningKey(), new IssueTokenCommand(aliceMile, Collections.singletonList(0)));
@@ -176,7 +168,7 @@ public class TokenContractIssueTests {
     @Test
     public void canHaveDifferentIssuersInIssueTransaction() {
         transaction(ledgerServices, tx -> {
-            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, alice, 20L));
             tx.output(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 30L));

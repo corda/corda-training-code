@@ -48,15 +48,12 @@ interface FlowHelpers {
                         new MockNetworkNotarySpec(CordaX500Name.parse(tokensConfig.get("notary")))))
                 .withCordappsForAllNodes(ImmutableList.of(
                         TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
-                        TestCordapp.findCordapp("com.template.flows"),
                         TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows")
                                 .withConfig(tokensConfig),
-                        TestCordapp.findCordapp("com.template.states")))
-                .withNetworkParameters(new NetworkParameters(4, Collections.emptyList(),
-                        10485760, 10485760 * 50,
-                        Instant.now(), 1, Collections.emptyMap(),
-                        Duration.ofDays(30), Collections.emptyMap()
-                ));
+                        TestCordapp.findCordapp("com.r3.corda.lib.tokens.money"),
+                        TestCordapp.findCordapp("com.r3.corda.lib.tokens.selection"),
+                        TestCordapp.findCordapp("com.template.states"),
+                        TestCordapp.findCordapp("com.template.flows")));
     }
 
     @NotNull
@@ -69,7 +66,7 @@ interface FlowHelpers {
                         quantity,
                         new IssuedTokenType(issuer.getInfo().getLegalIdentities().get(0), new AirMileType())),
                 holder.getInfo().getLegalIdentities().get(0),
-                null);
+                AirMileType.getContractAttachment());
     }
 
     @NotNull
