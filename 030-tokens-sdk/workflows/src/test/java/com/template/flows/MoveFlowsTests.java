@@ -1,6 +1,5 @@
 package com.template.flows;
 
-import com.google.common.collect.ImmutableList;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensFlowHandler;
 import com.template.flows.MoveFlows.Initiator;
@@ -8,7 +7,8 @@ import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.*;
 import net.corda.core.flows.FlowException;
 import net.corda.core.transactions.SignedTransaction;
-import net.corda.testing.node.*;
+import net.corda.testing.node.MockNetwork;
+import net.corda.testing.node.StartedMockNode;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -24,18 +24,18 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 public class MoveFlowsTests {
-    private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
-            .withNotarySpecs(ImmutableList.of(new MockNetworkNotarySpec(Constants.desiredNotary)))
-            .withCordappsForAllNodes(Arrays.asList(
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
-                    TestCordapp.findCordapp("com.template.flows"),
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"))));
-    private final StartedMockNode alice = network.createNode();
-    private final StartedMockNode bob = network.createNode();
-    private final StartedMockNode carly = network.createNode();
-    private final StartedMockNode dan = network.createNode();
+    private final MockNetwork network;
+    private final StartedMockNode alice;
+    private final StartedMockNode bob;
+    private final StartedMockNode carly;
+    private final StartedMockNode dan;
 
-    public MoveFlowsTests() {
+    public MoveFlowsTests() throws Exception {
+        network = new MockNetwork(prepareMockNetworkParameters());
+        alice = network.createNode();
+        bob = network.createNode();
+        carly = network.createNode();
+        dan = network.createNode();
         Arrays.asList(alice, bob, carly, dan).forEach(it ->
                 it.registerInitiatedFlow(Initiator.class, MoveTokensFlowHandler.class));
     }

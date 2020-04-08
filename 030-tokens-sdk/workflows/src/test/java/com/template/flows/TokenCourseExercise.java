@@ -1,7 +1,6 @@
 package com.template.flows;
 
 import co.paralleluniverse.fibers.Suspendable;
-import com.google.common.collect.ImmutableList;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
@@ -21,7 +20,9 @@ import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.core.node.services.vault.QueryCriteria;
 import net.corda.core.transactions.SignedTransaction;
-import net.corda.testing.node.*;
+import net.corda.testing.node.MockNetwork;
+import net.corda.testing.node.MockNodeParameters;
+import net.corda.testing.node.StartedMockNode;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
@@ -30,20 +31,22 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.List;
 
+import static com.template.flows.FlowHelpers.prepareMockNetworkParameters;
 import static org.junit.Assert.assertEquals;
 
 public class TokenCourseExercise {
     private static final CordaX500Name US_MINT = CordaX500Name.parse("O=US Mint, L=Washington D.C., C=US");
-    private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
-            .withCordappsForAllNodes(ImmutableList.of(
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"))));
-    private final StartedMockNode usMint = network.createNode(new MockNodeParameters()
-            .withLegalName(US_MINT));
-    private final StartedMockNode alice = network.createNode();
-    private final StartedMockNode bob = network.createNode();
+    private final MockNetwork network;
+    private final StartedMockNode usMint;
+    private final StartedMockNode alice;
+    private final StartedMockNode bob;
 
-    public TokenCourseExercise() {
+    public TokenCourseExercise() throws Exception {
+        network = new MockNetwork(prepareMockNetworkParameters());
+        usMint = network.createNode(new MockNodeParameters()
+                .withLegalName(US_MINT));
+        alice = network.createNode();
+        bob = network.createNode();
     }
 
     @Before

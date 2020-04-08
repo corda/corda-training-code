@@ -1,5 +1,6 @@
 package com.template.flows;
 
+import com.google.common.collect.ImmutableList;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
@@ -8,18 +9,38 @@ import javafx.util.Pair;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.identity.AbstractParty;
+import net.corda.core.identity.CordaX500Name;
 import net.corda.core.transactions.SignedTransaction;
-import net.corda.testing.node.MockNetwork;
-import net.corda.testing.node.StartedMockNode;
+import net.corda.testing.node.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
-import java.util.List;
+import java.io.File;
+import java.io.FileReader;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
 interface FlowHelpers {
+
+    @NotNull
+    static MockNetworkParameters prepareMockNetworkParameters() throws Exception {
+        Properties tokenProperties = new Properties();
+        tokenProperties.load(new FileReader(new File("res/tokens-workflows.properties")));
+        Map<String, String> tokensConfig = new HashMap<>();
+        for (Map.Entry<Object, Object> next : tokenProperties.entrySet()) {
+            tokensConfig.put((String) next.getKey(), (String) next.getValue());
+        }
+        return new MockNetworkParameters()
+                .withNotarySpecs(ImmutableList.of(
+                        new MockNetworkNotarySpec(CordaX500Name.parse("O=Unwanted Notary, L=London, C=GB")),
+                        new MockNetworkNotarySpec(CordaX500Name.parse(tokensConfig.get("notary")))))
+                .withCordappsForAllNodes(ImmutableList.of(
+                        TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
+                        TestCordapp.findCordapp("com.template.flows"),
+                        TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows")
+                                .withConfig(tokensConfig)));
+    }
 
     @NotNull
     static FungibleToken createFrom(

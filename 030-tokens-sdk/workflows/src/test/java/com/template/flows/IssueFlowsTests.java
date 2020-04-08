@@ -7,7 +7,8 @@ import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.ContractState;
 import net.corda.core.contracts.TransactionState;
 import net.corda.core.transactions.SignedTransaction;
-import net.corda.testing.node.*;
+import net.corda.testing.node.MockNetwork;
+import net.corda.testing.node.StartedMockNode;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -19,19 +20,18 @@ import static com.template.flows.FlowHelpers.*;
 import static org.junit.Assert.*;
 
 public class IssueFlowsTests {
-    private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
-            .withNotarySpecs(ImmutableList.of(new MockNetworkNotarySpec(Constants.desiredNotary)))
-            .withCordappsForAllNodes(ImmutableList.of(
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
-                    TestCordapp.findCordapp("com.template.flows"),
-                    TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows"))
-            ));
-    private final StartedMockNode alice = network.createNode();
-    private final StartedMockNode bob = network.createNode();
-    private final StartedMockNode carly = network.createNode();
-    private final StartedMockNode dan = network.createNode();
+    private final MockNetwork network;
+    private final StartedMockNode alice;
+    private final StartedMockNode bob;
+    private final StartedMockNode carly;
+    private final StartedMockNode dan;
 
-    public IssueFlowsTests() {
+    public IssueFlowsTests() throws Exception {
+        network = new MockNetwork(prepareMockNetworkParameters());
+        alice = network.createNode();
+        bob = network.createNode();
+        carly = network.createNode();
+        dan = network.createNode();
     }
 
     @Before
@@ -52,7 +52,7 @@ public class IssueFlowsTests {
 
         final SignedTransaction tx = future.get();
         //noinspection ConstantConditions
-        assertEquals(Constants.desiredNotary, tx.getNotary().getName());
+        assertEquals("O=App Notary, L=London, C=GB", tx.getNotary().getName().toString());
     }
 
     @Test
