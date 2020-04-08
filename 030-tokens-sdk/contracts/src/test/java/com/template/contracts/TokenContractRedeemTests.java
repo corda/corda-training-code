@@ -5,8 +5,10 @@ import com.r3.corda.lib.tokens.contracts.FungibleTokenContract;
 import com.r3.corda.lib.tokens.contracts.commands.RedeemTokenCommand;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
+import com.r3.corda.lib.tokens.contracts.utilities.TransactionUtilitiesKt;
 import com.template.states.AirMileType;
 import net.corda.core.contracts.Amount;
+import net.corda.core.crypto.SecureHash;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.testing.contracts.DummyContract;
@@ -26,20 +28,42 @@ public class TokenContractRedeemTests {
     private final Party alice = new TestIdentity(new CordaX500Name("Alice", "London", "GB")).getParty();
     private final Party bob = new TestIdentity(new CordaX500Name("Bob", "New York", "US")).getParty();
     private final Party carly = new TestIdentity(new CordaX500Name("Carly", "New York", "US")).getParty();
-    private final IssuedTokenType aliceMile = new IssuedTokenType(alice, AirMileType.create());
-    private final IssuedTokenType carlyMile = new IssuedTokenType(carly, AirMileType.create());
+    private final IssuedTokenType aliceMile = new IssuedTokenType(alice, new AirMileType());
+    private final IssuedTokenType carlyMile = new IssuedTokenType(carly, new AirMileType());
+
+    @NotNull
+    private static SecureHash getContractAttachment() {
+        //noinspection ConstantConditions
+        return TransactionUtilitiesKt.getAttachmentIdForGenericParam(new AirMileType());
+    }
 
     @NotNull
     private FungibleToken create(
             @NotNull final IssuedTokenType tokenType,
             @NotNull final Party holder,
             final long quantity) {
-        return new FungibleToken(new Amount<>(quantity, tokenType), holder, null);
+        return new FungibleToken(new Amount<>(quantity, tokenType), holder, getContractAttachment());
+    }
+
+    @Test
+    public void transactionMustIncludeTheAttachment() {
+        transaction(ledgerServices, tx -> {
+            tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
+            tx.command(
+                    Arrays.asList(alice.getOwningKey(), bob.getOwningKey()),
+                    new RedeemTokenCommand(aliceMile, Collections.singletonList(0), Collections.emptyList()));
+            tx.failsWith("Contract verification failed: Expected to find type jar");
+
+            tx.attachment("com.template.contracts", getContractAttachment());
+            tx.verifies();
+            return null;
+        });
     }
 
     @Test
     public void transactionMustIncludeATokenContractCommand() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.tweak(txCopy -> {
                 tx.command(Arrays.asList(alice.getOwningKey(), bob.getOwningKey()), new DummyContract.Commands.Create());
@@ -57,6 +81,7 @@ public class TokenContractRedeemTests {
     @Test
     public void redeemTransactionMustHaveLessInOutputs() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.command(
                     Arrays.asList(alice.getOwningKey(), bob.getOwningKey()),
@@ -75,6 +100,7 @@ public class TokenContractRedeemTests {
     @Test
     public void redeemTransactionMayHaveNoInputs() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), new DummyState());
             tx.command(
                     alice.getOwningKey(),
@@ -87,6 +113,7 @@ public class TokenContractRedeemTests {
     @Test
     public void inputsMayHaveAZeroQuantity() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 0L));
             tx.command(
@@ -102,6 +129,7 @@ public class TokenContractRedeemTests {
     // let that happen.
     public void inputsMustBeAccountedForInCommand() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 1L));
             tx.tweak(txCopy -> {
@@ -122,6 +150,7 @@ public class TokenContractRedeemTests {
     @Test
     public void issuerMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.tweak(txCopy -> {
                 txCopy.command(
@@ -141,6 +170,7 @@ public class TokenContractRedeemTests {
     @Test
     public void currentHolderMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.tweak(txCopy -> {
                 txCopy.command(
@@ -160,6 +190,7 @@ public class TokenContractRedeemTests {
     @Test
     public void allIssuersMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.input(FungibleTokenContract.Companion.getContractId(), create(carlyMile, bob, 20L));
             tx.command(
@@ -183,6 +214,7 @@ public class TokenContractRedeemTests {
     @Test
     public void allCurrentHoldersMustSignRedeemTransaction() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, carly, 20L));
             tx.tweak(txCopy -> {
@@ -203,6 +235,7 @@ public class TokenContractRedeemTests {
     @Test
     public void canHaveDifferentIssuersInRedeemTransaction() {
         transaction(ledgerServices, tx -> {
+            tx.attachment("com.template.contracts", getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 10L));
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, alice, 20L));
             tx.input(FungibleTokenContract.Companion.getContractId(), create(aliceMile, bob, 30L));

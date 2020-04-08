@@ -10,12 +10,15 @@ import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.CordaX500Name;
+import net.corda.core.node.NetworkParameters;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.FileReader;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,7 +50,13 @@ interface FlowHelpers {
                         TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
                         TestCordapp.findCordapp("com.template.flows"),
                         TestCordapp.findCordapp("com.r3.corda.lib.tokens.workflows")
-                                .withConfig(tokensConfig)));
+                                .withConfig(tokensConfig),
+                        TestCordapp.findCordapp("com.template.states")))
+                .withNetworkParameters(new NetworkParameters(4, Collections.emptyList(),
+                        10485760, 10485760 * 50,
+                        Instant.now(), 1, Collections.emptyMap(),
+                        Duration.ofDays(30), Collections.emptyMap()
+                ));
     }
 
     @NotNull
@@ -58,7 +67,7 @@ interface FlowHelpers {
         return new FungibleToken(
                 AmountUtilitiesKt.amount(
                         quantity,
-                        new IssuedTokenType(issuer.getInfo().getLegalIdentities().get(0), AirMileType.create())),
+                        new IssuedTokenType(issuer.getInfo().getLegalIdentities().get(0), new AirMileType())),
                 holder.getInfo().getLegalIdentities().get(0),
                 null);
     }

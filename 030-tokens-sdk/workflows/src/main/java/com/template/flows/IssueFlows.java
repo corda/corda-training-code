@@ -5,9 +5,11 @@ import com.google.common.collect.ImmutableList;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
+import com.r3.corda.lib.tokens.contracts.utilities.TransactionUtilitiesKt;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
 import com.template.states.AirMileType;
 import javafx.util.Pair;
+import net.corda.core.crypto.SecureHash;
 import net.corda.core.flows.*;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.Party;
@@ -75,7 +77,9 @@ public interface IssueFlows {
         public SignedTransaction call() throws FlowException {
             progressTracker.setCurrentStep(PREPARING_TO_PASS_ON);
             // It is a design decision to have this flow initiated by the issuer.
-            final IssuedTokenType issuedAirMile = new IssuedTokenType(getOurIdentity(), AirMileType.create());
+            final AirMileType airMileType = new AirMileType();
+            final IssuedTokenType issuedAirMile = new IssuedTokenType(getOurIdentity(), airMileType);
+            final SecureHash contractAttachment = TransactionUtilitiesKt.getAttachmentIdForGenericParam(airMileType);
 
             final List<FungibleToken> outputTokens = heldQuantities
                     // Thanks to the Stream, we are able to have our 'final List' in one go, instead of creating a
@@ -85,7 +89,7 @@ public interface IssueFlows {
                     .map(it -> new FungibleToken(
                             AmountUtilitiesKt.amount(it.getValue(), issuedAirMile),
                             it.getKey(),
-                            null))
+                            contractAttachment))
                     // Get away from a Stream and back to a good ol' List.
                     .collect(Collectors.toList());
 
