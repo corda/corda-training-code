@@ -13,6 +13,7 @@ import net.corda.core.transactions.TransactionBuilder;
 import net.corda.core.utilities.ProgressTracker;
 import net.corda.core.utilities.ProgressTracker.Step;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -39,7 +40,13 @@ public interface MoveFlows {
         private final ProgressTracker progressTracker;
 
         private final static Step PREPARING_TO_PASS_ON = new Step("Preparing to pass on to Tokens move flow.");
-        private final static Step PASSING_TO_SUB_MOVE = new Step("Passing on to Tokens move flow.");
+        private final static Step PASSING_TO_SUB_MOVE = new Step("Passing on to Tokens move flow.") {
+            @NotNull
+            @Override
+            public ProgressTracker childProgressTracker() {
+                return AbstractMoveTokensFlow.Companion.tracker();
+            }
+        };
 
         @NotNull
         public static ProgressTracker tracker() {
@@ -106,6 +113,12 @@ public interface MoveFlows {
                 @Override
                 public List<FlowSession> getObserverSessions() {
                     return Collections.emptyList();
+                }
+
+                @NotNull
+                @Override
+                public ProgressTracker getProgressTracker() {
+                    return PASSING_TO_SUB_MOVE.childProgressTracker();
                 }
 
                 @Override
