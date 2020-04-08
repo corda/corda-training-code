@@ -26,10 +26,18 @@ interface FlowHelpers {
     @NotNull
     static MockNetworkParameters prepareMockNetworkParameters() throws Exception {
         Properties tokenProperties = new Properties();
-        tokenProperties.load(new FileReader(new File("res/tokens-workflows.properties")));
+        tokenProperties.load(new FileReader(new File("res/tokens-workflows.conf")));
         Map<String, String> tokensConfig = new HashMap<>();
         for (Map.Entry<Object, Object> next : tokenProperties.entrySet()) {
-            tokensConfig.put((String) next.getKey(), (String) next.getValue());
+            final String rawValue = (String) next.getValue();
+            final String value;
+            if ((rawValue.startsWith("\"") && rawValue.endsWith("\"")) ||
+                    (rawValue.startsWith("'") && rawValue.endsWith("'"))) {
+                value = rawValue.substring(1, rawValue.length() - 1);
+            } else {
+                value = rawValue;
+            }
+            tokensConfig.put((String) next.getKey(), value);
         }
         return new MockNetworkParameters()
                 .withNotarySpecs(ImmutableList.of(
