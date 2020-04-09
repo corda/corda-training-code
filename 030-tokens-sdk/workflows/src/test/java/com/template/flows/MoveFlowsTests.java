@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
-import static com.template.flows.FlowHelpers.*;
+import static com.template.flows.FlowTestHelpers.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
@@ -53,8 +53,8 @@ public class MoveFlowsTests {
     public void flowFailsWhenInitiatorIsMissingTransactionsTheyWereNotPartyTo() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(
                 alice, network, Arrays.asList(
-                        new FlowHelpers.NodeHolding(bob, 10L),
-                        new FlowHelpers.NodeHolding(dan, 20L)));
+                        new FlowTestHelpers.NodeHolding(bob, 10L),
+                        new FlowTestHelpers.NodeHolding(dan, 20L)));
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(
                 createFrom(alice, dan, 30L)));
@@ -70,7 +70,7 @@ public class MoveFlowsTests {
     @Test
     public void SignedTransactionReturnedByTheFlowIsSignedByTheHolder() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(
-                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+                alice, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 10L)));
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(
                 createFrom(alice, carly, 10L)));
@@ -85,7 +85,7 @@ public class MoveFlowsTests {
     @Test
     public void flowRecordsATransactionInHolderTransactionStoragesOnly() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
-                new FlowHelpers.NodeHolding(bob, 10L)));
+                new FlowTestHelpers.NodeHolding(bob, 10L)));
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(
                 createFrom(alice, carly, 10L)));
@@ -105,7 +105,7 @@ public class MoveFlowsTests {
     @Test
     public void recordedTransactionHasASingleInputAndASingleOutput() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
-                new FlowHelpers.NodeHolding(bob, 10L)));
+                new FlowTestHelpers.NodeHolding(bob, 10L)));
         final FungibleToken expectedInput = issuedTokens.get(0).getState().getData();
         final FungibleToken expectedOutput = createFrom(alice, carly, 10L);
 
@@ -133,8 +133,8 @@ public class MoveFlowsTests {
     @Test
     public void recordedTransactionHasTwoInputsAnd1OutputSameIssuer() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
-                new FlowHelpers.NodeHolding(bob, 10L),
-                new FlowHelpers.NodeHolding(bob, 20L)));
+                new FlowTestHelpers.NodeHolding(bob, 10L),
+                new FlowTestHelpers.NodeHolding(bob, 20L)));
         final List<FungibleToken> expectedInputs = issuedTokens.stream()
                 .map(it -> it.getState().getData())
                 .collect(Collectors.toList());
@@ -169,7 +169,7 @@ public class MoveFlowsTests {
     @Test
     public void thereIsOneRecordedStateAfterMoveOnlyInRecipientIssuerKeepsOldState() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
-                new FlowHelpers.NodeHolding(bob, 10L)));
+                new FlowTestHelpers.NodeHolding(bob, 10L)));
         final FungibleToken expectedOutput = createFrom(alice, carly, 10L);
 
         final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(expectedOutput));
@@ -187,9 +187,9 @@ public class MoveFlowsTests {
     @Test
     public void thereAreTwoRecordedStatesAfterMoveOnlyInRecipientDifferentIssuerIssuersKeepOldStates() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network,
-                Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+                Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 10L)));
         issuedTokens.addAll(issueTokens(carly, network,
-                Collections.singletonList(new FlowHelpers.NodeHolding(bob, 20L))));
+                Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 20L))));
         final FungibleToken expectedOutput1 = createFrom(alice, dan, 10L);
         final FungibleToken expectedOutput2 = createFrom(carly, dan, 20L);
 

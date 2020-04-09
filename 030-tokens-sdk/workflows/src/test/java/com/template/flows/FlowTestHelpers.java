@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
-interface FlowHelpers {
+public interface FlowTestHelpers {
 
     @NotNull
     static MockNetworkParameters prepareMockNetworkParameters() throws Exception {

@@ -17,7 +17,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static com.template.flows.FlowHelpers.*;
+import static com.template.flows.FlowTestHelpers.*;
 import static org.junit.Assert.*;
 
 public class RedeemFlowsTests {
@@ -50,7 +50,7 @@ public class RedeemFlowsTests {
     @Test
     public void SignedTransactionReturnedByTheFlowIsSignedByBothTheIssuerAndTheHolder() throws Throwable {
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
-                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+                alice, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 10L)));
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
@@ -63,9 +63,9 @@ public class RedeemFlowsTests {
     @Test
     public void SignedTransactionReturnedByTheFlowIsSignedByBothIssuersAndTheHolder() throws Throwable {
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
-                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+                alice, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 10L)));
         tokens.addAll(issueTokens(
-                carly, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 20L))));
+                carly, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 20L))));
         final Initiator flow = new Initiator(Collections.singletonList(tokens.get(0)));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
@@ -85,7 +85,7 @@ public class RedeemFlowsTests {
     @Test
     public void flowRecordsATransactionInIssuerAndHolderTransactionStoragesOnly() throws Throwable {
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
-                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+                alice, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 10L)));
 
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
@@ -104,9 +104,9 @@ public class RedeemFlowsTests {
     @Test
     public void flowRecordsATransactionInBothIssuersAndHolderTransactionStoragesOnly() throws Throwable {
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
-                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+                alice, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 10L)));
         tokens.addAll(issueTokens(
-                carly, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 20L))));
+                carly, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 20L))));
         final Initiator flow = new Initiator(Collections.singletonList(tokens.get(0)));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
@@ -123,8 +123,8 @@ public class RedeemFlowsTests {
     public void flowRecordsATransactionInIssuerAndBothHolderTransactionStorages() throws Throwable {
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
                 alice, network, Arrays.asList(
-                        new FlowHelpers.NodeHolding(bob, 10L),
-                        new FlowHelpers.NodeHolding(carly, 20L)));
+                        new FlowTestHelpers.NodeHolding(bob, 10L),
+                        new FlowTestHelpers.NodeHolding(carly, 20L)));
         final Initiator flow = new Initiator(Collections.singletonList(tokens.get(0)));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
@@ -141,7 +141,7 @@ public class RedeemFlowsTests {
     public void recordedTransactionHasASingleInputTheFungibleTokenAndNoOutputs() throws Throwable {
         final FungibleToken expected = createFrom(alice, bob, 10L);
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
-                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+                alice, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 10L)));
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
@@ -160,7 +160,7 @@ public class RedeemFlowsTests {
     @Test
     public void thereIsNoRecordedStateAfterRedeem() throws Throwable {
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
-                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+                alice, network, Collections.singletonList(new FlowTestHelpers.NodeHolding(bob, 10L)));
         final Initiator flow = new Initiator(tokens);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
@@ -176,8 +176,8 @@ public class RedeemFlowsTests {
         final FungibleToken expected = createFrom(alice, bob, 10L);
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
                 alice, network, Arrays.asList(
-                        new FlowHelpers.NodeHolding(bob, 10L),
-                        new FlowHelpers.NodeHolding(carly, 20L)));
+                        new FlowTestHelpers.NodeHolding(bob, 10L),
+                        new FlowTestHelpers.NodeHolding(carly, 20L)));
         final Initiator flow = new Initiator(Collections.singletonList(tokens.get(0)));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
@@ -198,8 +198,8 @@ public class RedeemFlowsTests {
         final FungibleToken expected = createFrom(alice, carly, 20L);
         final List<StateAndRef<FungibleToken>> tokens = issueTokens(
                 alice, network, Arrays.asList(
-                        new FlowHelpers.NodeHolding(bob, 10L),
-                        new FlowHelpers.NodeHolding(carly, 20L)));
+                        new FlowTestHelpers.NodeHolding(bob, 10L),
+                        new FlowTestHelpers.NodeHolding(carly, 20L)));
         final Initiator flow = new Initiator(Collections.singletonList(tokens.get(0)));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();

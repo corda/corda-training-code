@@ -16,7 +16,7 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.List;
 
-import static com.template.flows.FlowHelpers.*;
+import static com.template.flows.FlowTestHelpers.*;
 import static org.junit.Assert.*;
 
 public class IssueFlowsTests {
