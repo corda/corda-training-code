@@ -1,13 +1,13 @@
 package com.template.flows;
 
+import com.google.common.collect.ImmutableList;
 import com.template.states.TokenState;
 import javafx.util.Pair;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.identity.Party;
 import net.corda.core.transactions.SignedTransaction;
-import net.corda.testing.node.MockNetwork;
-import net.corda.testing.node.StartedMockNode;
+import net.corda.testing.node.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -17,6 +17,16 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertEquals;
 
 interface FlowHelpers {
+
+    @NotNull
+    static MockNetworkParameters prepareMockNetworkParameters() throws Exception {
+        return new MockNetworkParameters()
+                .withNotarySpecs(ImmutableList.of(new MockNetworkNotarySpec(Constants.desiredNotary)))
+                .withCordappsForAllNodes(ImmutableList.of(
+                        TestCordapp.findCordapp("com.template.contracts"),
+                        TestCordapp.findCordapp("com.template.flows"))
+                );
+    }
 
     @NotNull
     static TokenState createFrom(

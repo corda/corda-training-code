@@ -1,6 +1,5 @@
 package com.template.flows;
 
-import com.google.common.collect.ImmutableList;
 import com.template.flows.RedeemFlows.Initiator;
 import com.template.flows.RedeemFlows.SimpleInitiator;
 import com.template.states.TokenState;
@@ -13,7 +12,8 @@ import net.corda.core.contracts.TransactionState;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowSession;
 import net.corda.core.transactions.SignedTransaction;
-import net.corda.testing.node.*;
+import net.corda.testing.node.MockNetwork;
+import net.corda.testing.node.StartedMockNode;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
@@ -29,17 +29,18 @@ import static com.template.flows.FlowHelpers.*;
 import static org.junit.Assert.*;
 
 public class RedeemFlowsTests {
-    private final MockNetwork network = new MockNetwork(new MockNetworkParameters()
-            .withNotarySpecs(ImmutableList.of(new MockNetworkNotarySpec(Constants.desiredNotary)))
-            .withCordappsForAllNodes(Arrays.asList(
-                    TestCordapp.findCordapp("com.template.contracts"),
-                    TestCordapp.findCordapp("com.template.flows"))));
-    private final StartedMockNode alice = network.createNode();
-    private final StartedMockNode bob = network.createNode();
-    private final StartedMockNode carly = network.createNode();
-    private final StartedMockNode dan = network.createNode();
+    private final MockNetwork network;
+    private final StartedMockNode alice;
+    private final StartedMockNode bob;
+    private final StartedMockNode carly;
+    private final StartedMockNode dan;
 
-    public RedeemFlowsTests() {
+    public RedeemFlowsTests() throws Exception {
+        network = new MockNetwork(prepareMockNetworkParameters());
+        alice = network.createNode();
+        bob = network.createNode();
+        carly = network.createNode();
+        dan = network.createNode();
         Arrays.asList(alice, bob, carly).forEach(it -> {
             it.registerInitiatedFlow(IssueFlows.Responder.class);
             it.registerInitiatedFlow(RedeemFlows.Initiator.class, UnsafeResponder.class);

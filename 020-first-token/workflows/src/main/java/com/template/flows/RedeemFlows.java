@@ -30,7 +30,7 @@ import static com.template.contracts.TokenContract.Commands.Redeem;
 public interface RedeemFlows {
 
     /**
-     * Started by a ${@link TokenState#getHolder()}  to redeem multiple states where it is one of the holders.
+     * Started by a ${@link TokenState#getHolder()} to redeem multiple states where it is one of the holders.
      * Because it is an ${@link InitiatingFlow}, its counterpart flow ${@link Responder} is called automatically.
      * This constructor would be called by RPC or by ${@link FlowLogic#subFlow}. In particular one that would be more
      * user-friendly in terms of parameters passed. For instance, given sums, it would fetch the precise states in
