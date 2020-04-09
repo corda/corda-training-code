@@ -34,14 +34,14 @@ import java.util.List;
 import static com.template.flows.FlowHelpers.prepareMockNetworkParameters;
 import static org.junit.Assert.assertEquals;
 
-public class TokenCourseExercise {
+public class UsdTokenCourseExercise {
     private static final CordaX500Name US_MINT = CordaX500Name.parse("O=US Mint, L=Washington D.C., C=US");
     private final MockNetwork network;
     private final StartedMockNode usMint;
     private final StartedMockNode alice;
     private final StartedMockNode bob;
 
-    public TokenCourseExercise() throws Exception {
+    public UsdTokenCourseExercise() throws Exception {
         network = new MockNetwork(prepareMockNetworkParameters());
         usMint = network.createNode(new MockNodeParameters()
                 .withLegalName(US_MINT));

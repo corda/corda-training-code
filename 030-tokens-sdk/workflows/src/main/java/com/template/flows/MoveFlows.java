@@ -13,7 +13,6 @@ import net.corda.core.transactions.TransactionBuilder;
 import net.corda.core.utilities.ProgressTracker;
 import net.corda.core.utilities.ProgressTracker.Step;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,8 +22,9 @@ import static com.r3.corda.lib.tokens.workflows.utilities.FlowUtilitiesKt.sessio
 public interface MoveFlows {
 
     /**
-     * Started by a {@link FungibleToken#getHolder} to move multiple states where it is one of the holders.
-     * It is an {@link InitiatingFlow} flow and its counterpart already exists, it is {@link MoveFungibleTokensHandler}.
+     * Started by a {@link FungibleToken#getHolder} to move multiple states where it is the only holder.
+     * It is an {@link InitiatingFlow} flow and its counterpart, which already exists, is
+     * {@link MoveFungibleTokensHandler}, while not being automatically {@link InitiatedBy} it.
      * This constructor would be called by RPC or by {@link FlowLogic#subFlow}. In particular one that, given sums,
      * fetches states in the vault.
      */
@@ -59,6 +59,10 @@ public interface MoveFlows {
                 @NotNull final ProgressTracker progressTracker) {
             //noinspection ConstantConditions
             if (inputTokens == null) throw new NullPointerException("inputTokens cannot be null");
+            final Set<AbstractParty> holders = inputTokens.stream()
+                    .map(it -> it.getState().getData().getHolder())
+                    .collect(Collectors.toSet());
+            if (holders.size() != 1) throw new IllegalArgumentException("There can be only one holder");
             this.inputTokens = inputTokens;
             //noinspection ConstantConditions
             if (outputTokens == null) throw new NullPointerException("outputTokens cannot be null");

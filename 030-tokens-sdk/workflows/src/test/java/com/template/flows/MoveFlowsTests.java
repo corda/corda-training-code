@@ -5,7 +5,6 @@ import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensFlowHandler;
 import com.template.flows.MoveFlows.Initiator;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.*;
-import net.corda.core.flows.FlowException;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.MockNetwork;
 import net.corda.testing.node.StartedMockNode;
@@ -50,16 +49,15 @@ public class MoveFlowsTests {
         network.stopNodes();
     }
 
-    @Test(expected = FlowException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void flowFailsWhenInitiatorIsMissingTransactionsTheyWereNotPartyTo() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(
-                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
-        issuedTokens.addAll(issueTokens(
-                carly, network, Collections.singletonList(new FlowHelpers.NodeHolding(dan, 20L))));
+                alice, network, Arrays.asList(
+                        new FlowHelpers.NodeHolding(bob, 10L),
+                        new FlowHelpers.NodeHolding(dan, 20L)));
 
-        final Initiator flow = new Initiator(issuedTokens, Arrays.asList(
-                createFrom(alice, dan, 10L),
-                createFrom(carly, bob, 20L)));
+        final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(
+                createFrom(alice, dan, 30L)));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
         try {
@@ -85,20 +83,6 @@ public class MoveFlowsTests {
     }
 
     @Test
-    public void SignedTransactionReturnedByTheFlowIsSignedByBothHoldersSameIssuer() throws Throwable {
-        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
-                new FlowHelpers.NodeHolding(bob, 10L),
-                new FlowHelpers.NodeHolding(carly, 20L)));
-
-        final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(
-                createFrom(alice, dan, 30L)));
-        final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
-        network.runNetwork();
-        final SignedTransaction tx = future.get();
-        tx.verifySignaturesExcept(alice.getInfo().getLegalIdentities().get(0).getOwningKey());
-    }
-
-    @Test
     public void flowRecordsATransactionInHolderTransactionStoragesOnly() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Collections.singletonList(
                 new FlowHelpers.NodeHolding(bob, 10L)));
@@ -116,25 +100,6 @@ public class MoveFlowsTests {
         for (StartedMockNode node : Arrays.asList(alice, dan)) {
             assertNull(node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
         }
-    }
-
-    @Test
-    public void flowRecordsATransactionInBothHoldersTransactionStoragesSameIssuer() throws Throwable {
-        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
-                new FlowHelpers.NodeHolding(bob, 10L),
-                new FlowHelpers.NodeHolding(carly, 20L)));
-
-        final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(
-                createFrom(alice, dan, 30L)));
-        final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
-        network.runNetwork();
-        final SignedTransaction tx = future.get();
-
-        // We check the recorded transaction in 3 transaction storages.
-        for (StartedMockNode node : Arrays.asList(bob, carly, dan)) {
-            assertEquals(tx, node.getServices().getValidatedTransactions().getTransaction(tx.getId()));
-        }
-        assertNull(alice.getServices().getValidatedTransactions().getTransaction(tx.getId()));
     }
 
     @Test
@@ -169,7 +134,7 @@ public class MoveFlowsTests {
     public void recordedTransactionHasTwoInputsAnd1OutputSameIssuer() throws Throwable {
         final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
                 new FlowHelpers.NodeHolding(bob, 10L),
-                new FlowHelpers.NodeHolding(carly, 20L)));
+                new FlowHelpers.NodeHolding(bob, 20L)));
         final List<FungibleToken> expectedInputs = issuedTokens.stream()
                 .map(it -> it.getState().getData())
                 .collect(Collectors.toList());
@@ -181,7 +146,7 @@ public class MoveFlowsTests {
         final SignedTransaction tx = future.get();
 
         // We check the recorded transaction in 3 vaults.
-        for (StartedMockNode node : Arrays.asList(bob, carly, dan)) {
+        for (StartedMockNode node : Arrays.asList(bob, dan)) {
             SignedTransaction recordedTx = node.getServices().getValidatedTransactions().getTransaction(tx.getId());
             @SuppressWarnings("ConstantConditions")
             List<StateRef> txInputs = recordedTx.getTx().getInputs();
@@ -198,7 +163,7 @@ public class MoveFlowsTests {
             assertEquals(1, txOutputs.size());
             assertEquals(expectedOutput, txOutputs.get(0).getData());
         }
-        alice.getServices().getValidatedTransactions().getTransaction(tx.getId());
+        assertNull(alice.getServices().getValidatedTransactions().getTransaction(tx.getId()));
     }
 
     @Test
@@ -220,23 +185,24 @@ public class MoveFlowsTests {
     }
 
     @Test
-    public void thereIsOneRecordedStateAfterMoveOnlyInRecipientSameIssuerIssuerKeepsOldStates() throws Throwable {
-        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network, Arrays.asList(
-                new FlowHelpers.NodeHolding(bob, 10L),
-                new FlowHelpers.NodeHolding(carly, 20L)));
-        final FungibleToken expectedOutput = createFrom(alice, dan, 30L);
+    public void thereAreTwoRecordedStatesAfterMoveOnlyInRecipientDifferentIssuerIssuersKeepOldStates() throws Throwable {
+        final List<StateAndRef<FungibleToken>> issuedTokens = issueTokens(alice, network,
+                Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+        issuedTokens.addAll(issueTokens(carly, network,
+                Collections.singletonList(new FlowHelpers.NodeHolding(bob, 20L))));
+        final FungibleToken expectedOutput1 = createFrom(alice, dan, 10L);
+        final FungibleToken expectedOutput2 = createFrom(carly, dan, 20L);
 
-        final Initiator flow = new Initiator(issuedTokens, Collections.singletonList(expectedOutput));
+        final Initiator flow = new Initiator(issuedTokens, Arrays.asList(expectedOutput1, expectedOutput2));
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
         network.runNetwork();
         future.get();
 
         // We check the states in vaults.
-        assertHasStatesInVault(alice,
-                issuedTokens.stream().map(it -> it.getState().getData()).collect(Collectors.toList()));
+        assertHasStatesInVault(alice, Collections.singletonList(issuedTokens.get(0).getState().getData()));
         assertHasStatesInVault(bob, Collections.emptyList());
-        assertHasStatesInVault(carly, Collections.emptyList());
-        assertHasStatesInVault(dan, Collections.singletonList(expectedOutput));
+        assertHasStatesInVault(carly, Collections.singletonList(issuedTokens.get(1).getState().getData()));
+        assertHasStatesInVault(dan, Arrays.asList(expectedOutput1, expectedOutput2));
     }
 
 }

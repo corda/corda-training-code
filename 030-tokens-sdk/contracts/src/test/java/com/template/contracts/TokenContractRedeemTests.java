@@ -1,6 +1,5 @@
 package com.template.contracts;
 
-import com.google.common.collect.ImmutableList;
 import com.r3.corda.lib.tokens.contracts.FungibleTokenContract;
 import com.r3.corda.lib.tokens.contracts.commands.RedeemTokenCommand;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
@@ -22,7 +21,7 @@ import java.util.Collections;
 import static net.corda.testing.node.NodeTestUtils.transaction;
 
 public class TokenContractRedeemTests {
-    private final MockServices ledgerServices = new MockServices(ImmutableList.of("com.r3.corda.lib.tokens.contracts"));
+    private final MockServices ledgerServices = new MockServices(Collections.singletonList("com.r3.corda.lib.tokens.contracts"));
     private final Party alice = new TestIdentity(new CordaX500Name("Alice", "London", "GB")).getParty();
     private final Party bob = new TestIdentity(new CordaX500Name("Bob", "New York", "US")).getParty();
     private final Party carly = new TestIdentity(new CordaX500Name("Carly", "New York", "US")).getParty();
@@ -90,7 +89,7 @@ public class TokenContractRedeemTests {
     }
 
     @Test
-    public void redeemTransactionMayHaveNoInputs() {
+    public void redeemTransactionMayHaveNoOutputs() {
         transaction(ledgerServices, tx -> {
             tx.attachment("com.template.contracts", AirMileType.getContractAttachment());
             tx.input(FungibleTokenContract.Companion.getContractId(), new DummyState());

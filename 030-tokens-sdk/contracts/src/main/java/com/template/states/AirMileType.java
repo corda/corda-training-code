@@ -35,5 +35,4 @@ public final class AirMileType extends TokenType {
     public int hashCode() {
         return Objects.hash("AirMileType");
     }
-
 }

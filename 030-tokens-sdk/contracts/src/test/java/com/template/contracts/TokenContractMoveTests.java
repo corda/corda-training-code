@@ -1,18 +1,17 @@
 package com.template.contracts;
 
-import com.google.common.collect.ImmutableList;
 import com.r3.corda.lib.tokens.contracts.FungibleTokenContract;
 import com.r3.corda.lib.tokens.contracts.commands.MoveTokenCommand;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.template.states.AirMileType;
-import kotlin.NotImplementedError;
 import net.corda.core.contracts.Amount;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.testing.contracts.DummyContract;
 import net.corda.testing.core.TestIdentity;
 import net.corda.testing.node.MockServices;
+import org.apache.commons.lang3.NotImplementedException;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 
@@ -23,7 +22,7 @@ import static net.corda.testing.node.NodeTestUtils.transaction;
 import static org.junit.Assert.assertEquals;
 
 public class TokenContractMoveTests {
-    private final MockServices ledgerServices = new MockServices(ImmutableList.of("com.r3.corda.lib.tokens.contracts"));
+    private final MockServices ledgerServices = new MockServices(Collections.singletonList("com.r3.corda.lib.tokens.contracts"));
     private final Party alice = new TestIdentity(new CordaX500Name("Alice", "London", "GB")).getParty();
     private final Party bob = new TestIdentity(new CordaX500Name("Bob", "New York", "US")).getParty();
     private final Party carly = new TestIdentity(new CordaX500Name("Carly", "New York", "US")).getParty();
@@ -278,7 +277,7 @@ public class TokenContractMoveTests {
                 tx.failsWith("The sum of quantities for each issuer should be conserved.");
                 return null;
             });
-            throw new NotImplementedError("Should not reach here");
+            throw new NotImplementedException("Should not reach here");
         } catch (AssertionError e) {
             assertEquals(ArithmeticException.class, e.getCause().getCause().getClass());
         }

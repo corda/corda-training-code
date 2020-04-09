@@ -10,15 +10,12 @@ import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.CordaX500Name;
-import net.corda.core.node.NetworkParameters;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.FileReader;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,20 +25,7 @@ interface FlowHelpers {
 
     @NotNull
     static MockNetworkParameters prepareMockNetworkParameters() throws Exception {
-        Properties tokenProperties = new Properties();
-        tokenProperties.load(new FileReader(new File("res/tokens-workflows.conf")));
-        Map<String, String> tokensConfig = new HashMap<>();
-        for (Map.Entry<Object, Object> next : tokenProperties.entrySet()) {
-            final String rawValue = (String) next.getValue();
-            final String value;
-            if ((rawValue.startsWith("\"") && rawValue.endsWith("\"")) ||
-                    (rawValue.startsWith("'") && rawValue.endsWith("'"))) {
-                value = rawValue.substring(1, rawValue.length() - 1);
-            } else {
-                value = rawValue;
-            }
-            tokensConfig.put((String) next.getKey(), value);
-        }
+        final Map<String, String> tokensConfig = getPropertiesFromConf("res/tokens-workflows.conf");
         return new MockNetworkParameters()
                 .withNotarySpecs(ImmutableList.of(
                         new MockNetworkNotarySpec(CordaX500Name.parse("O=Unwanted Notary, L=London, C=GB")),
@@ -54,6 +38,27 @@ interface FlowHelpers {
                         TestCordapp.findCordapp("com.r3.corda.lib.tokens.selection"),
                         TestCordapp.findCordapp("com.template.states"),
                         TestCordapp.findCordapp("com.template.flows")));
+    }
+
+    @NotNull
+    static Map<String, String> getPropertiesFromConf(@NotNull final String pathname) throws Exception {
+        final Properties tokenProperties = new Properties();
+        tokenProperties.load(new FileReader(new File("res/tokens-workflows.conf")));
+        final Map<String, String> tokensConfig = new HashMap<>();
+        for (Map.Entry<Object, Object> next : tokenProperties.entrySet()) {
+            tokensConfig.put((String) next.getKey(), removeQuotes((String) next.getValue()));
+        }
+        return tokensConfig;
+    }
+
+    @NotNull
+    static String removeQuotes(@NotNull final String rawValue) {
+        if ((rawValue.startsWith("\"") && rawValue.endsWith("\"")) ||
+                (rawValue.startsWith("'") && rawValue.endsWith("'"))) {
+            return rawValue.substring(1, rawValue.length() - 1);
+        } else {
+            return rawValue;
+        }
     }
 
     @NotNull
