@@ -29,7 +29,7 @@ class IssueUsdFlow extends FlowLogic<SignedTransaction> {
     @Suspendable
     public SignedTransaction call() throws FlowException {
         final TokenType usdTokenType = new TokenType("USD", 2);
-        if (!getOurIdentity().getName().equals(UsdTokenCourseExercise.US_MINT)) {
+        if (!getOurIdentity().getName().equals(UsdTokenCourseHelpers.US_MINT)) {
             throw new FlowException("We are not the US Mint");
         }
         final IssuedTokenType usMintUsd = new IssuedTokenType(getOurIdentity(), usdTokenType);

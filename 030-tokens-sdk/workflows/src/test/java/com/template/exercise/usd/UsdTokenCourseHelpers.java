@@ -5,10 +5,13 @@ import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import net.corda.core.contracts.Amount;
+import net.corda.core.identity.CordaX500Name;
 import net.corda.testing.node.StartedMockNode;
 import org.jetbrains.annotations.NotNull;
 
 public interface UsdTokenCourseHelpers {
+    CordaX500Name US_MINT = CordaX500Name.parse("O=US Mint, L=Washington D.C., C=US");
+
     @NotNull
     static FungibleToken createUsdFungible(
             @NotNull final StartedMockNode issuer,

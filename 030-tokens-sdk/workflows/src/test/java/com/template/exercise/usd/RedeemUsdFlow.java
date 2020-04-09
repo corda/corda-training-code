@@ -26,7 +26,7 @@ class RedeemUsdFlow extends FlowLogic<SignedTransaction> {
     @Suspendable
     public SignedTransaction call() throws FlowException {
         final TokenType usdTokenType = FiatCurrency.Companion.getInstance("USD");
-        final Party usMint = getServiceHub().getNetworkMapCache().getPeerByLegalName(UsdTokenCourseExercise.US_MINT);
+        final Party usMint = getServiceHub().getNetworkMapCache().getPeerByLegalName(UsdTokenCourseHelpers.US_MINT);
         if (usMint == null) throw new FlowException("No US Mint found");
 
         // Describe how to find those $ held by Me.

@@ -3,7 +3,6 @@ package com.template.exercise.usd;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
-import net.corda.core.identity.CordaX500Name;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.MockNetwork;
 import net.corda.testing.node.MockNodeParameters;
@@ -18,7 +17,6 @@ import static com.template.flows.FlowTestHelpers.prepareMockNetworkParameters;
 import static org.junit.Assert.assertEquals;
 
 public class UsdTokenCourseExercise {
-    public static final CordaX500Name US_MINT = CordaX500Name.parse("O=US Mint, L=Washington D.C., C=US");
     private final MockNetwork network;
     private final StartedMockNode usMint;
     private final StartedMockNode alice;
@@ -27,7 +25,7 @@ public class UsdTokenCourseExercise {
     public UsdTokenCourseExercise() throws Exception {
         network = new MockNetwork(prepareMockNetworkParameters());
         usMint = network.createNode(new MockNodeParameters()
-                .withLegalName(US_MINT));
+                .withLegalName(UsdTokenCourseHelpers.US_MINT));
         alice = network.createNode();
         bob = network.createNode();
     }

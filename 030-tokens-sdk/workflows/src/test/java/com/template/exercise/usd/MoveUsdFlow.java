@@ -32,7 +32,7 @@ class MoveUsdFlow extends FlowLogic<SignedTransaction> {
     public SignedTransaction call() throws FlowException {
         // Prepare what we are talking about.
         final TokenType usdTokenType = FiatCurrency.Companion.getInstance("USD");
-        final Party usMint = getServiceHub().getNetworkMapCache().getPeerByLegalName(UsdTokenCourseExercise.US_MINT);
+        final Party usMint = getServiceHub().getNetworkMapCache().getPeerByLegalName(UsdTokenCourseHelpers.US_MINT);
         if (usMint == null) throw new FlowException("No US Mint found");
 
         // Who is going to own the output, and how much?
