@@ -2,15 +2,10 @@ package com.template.exercise.car;
 
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
-import com.r3.corda.lib.tokens.workflows.flows.rpc.MoveNonFungibleTokens;
-import com.r3.corda.lib.tokens.workflows.flows.rpc.UpdateEvolvableToken;
-import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
-import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.Party;
-import net.corda.core.node.services.vault.QueryCriteria;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.MockNetwork;
 import net.corda.testing.node.MockNodeParameters;
@@ -87,10 +82,7 @@ public class CarTokenCourseExercise {
             final long mileage,
             final long price,
             @NotNull final List<Party> observers) throws Exception {
-        final CarTokenType car = carRef.getState().getData();
-        final CarTokenType updatedCar = new CarTokenType(car.getMaintainers(), car.getLinearId(),
-                car.getVin(), car.getMake(), mileage, price);
-        final UpdateEvolvableToken flow = new UpdateEvolvableToken(carRef, updatedCar, observers);
+        final UpdateCarTokenTypeFlow flow = new UpdateCarTokenTypeFlow(carRef, mileage, price, observers);
         final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
         network.runNetwork();
         return future.get();
@@ -99,11 +91,11 @@ public class CarTokenCourseExercise {
     @NotNull
     private SignedTransaction moveCarTo(
             @NotNull final TokenPointer<CarTokenType> carTokenTypePointer,
-            @NotNull final AbstractParty newHolder) throws Exception {
-        final PartyAndToken bobAndBmw = new PartyAndToken(newHolder, carTokenTypePointer);
-        final QueryCriteria alicesBmwCriteria = QueryUtilitiesKt.heldTokenAmountCriteria(
-                carTokenTypePointer, alice.getInfo().getLegalIdentities().get(0));
-        final MoveNonFungibleTokens flow = new MoveNonFungibleTokens(bobAndBmw, Collections.emptyList());
+            @NotNull final AbstractParty newHolder,
+            @NotNull final List<Party> observers) throws Exception {
+        final MoveCarToNewHolderFlow flow = new MoveCarToNewHolderFlow(carTokenTypePointer,
+                newHolder,
+                observers);
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
         network.runNetwork();
         return future.get();
@@ -142,14 +134,15 @@ public class CarTokenCourseExercise {
     }
 
     @Test
-    public void isUpdated() throws Exception {
+    public void isIssuedThenUpdated() throws Exception {
         final StateAndRef<CarTokenType> bmwRef = createNewBmw("abc125", "BMW", 30_000L,
                 Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
         final CarTokenType bmw = bmwRef.getState().getData();
-        final NonFungibleToken alicesBmw = issueCarTo(bmw, alice.getInfo().getLegalIdentities().get(0))
+        issueCarTo(bmw, alice.getInfo().getLegalIdentities().get(0))
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
                 .getState().getData();
+        // The DMV forgets to inform Alice BTW.
         final CarTokenType updatedBmw = updateMileageOn(bmwRef, 8_000L, 22_000L, Collections.emptyList())
                 .getCoreTransaction().outputsOfType(CarTokenType.class).get(0);
         assertEquals(bmw.getLinearId(), updatedBmw.getLinearId());
@@ -157,10 +150,18 @@ public class CarTokenCourseExercise {
         assertEquals("BMW", updatedBmw.getMake());
         assertEquals(8_000L, updatedBmw.getMileage());
         assertEquals(22_000L, updatedBmw.getPrice());
+
+        // Alice still has the old version because it was not an observer.
+        final List<StateAndRef<CarTokenType>> carTypes = alice.getServices().getVaultService()
+                .queryBy(CarTokenType.class).getStates();
+        assertEquals(1, carTypes.size());
+        final CarTokenType bmwAccordingToAlice = carTypes.get(0).getState().getData();
+        assertEquals(0L, bmwAccordingToAlice.getMileage());
+        assertEquals(30_000L, bmwAccordingToAlice.getPrice());
     }
 
     @Test
-    public void isSoldToBob() throws Exception {
+    public void isIssuedUpdatedAndSoldToBob() throws Exception {
         final StateAndRef<CarTokenType> bmwRef = createNewBmw("abc126", "BMW", 30_000L,
                 Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
@@ -168,24 +169,26 @@ public class CarTokenCourseExercise {
         final NonFungibleToken alicesBmw = issueCarTo(bmw, alice.getInfo().getLegalIdentities().get(0))
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
                 .getState().getData();
-
         final CarTokenType updatedBmw = updateMileageOn(
                 bmwRef, 9_000L, 21_000L,
-                // Alice needs to know now.
+                // Now, Alice needs to know.
                 Collections.singletonList(alice.getInfo().getLegalIdentities().get(0)))
                 .getCoreTransaction().outputsOfType(CarTokenType.class).get(0);
-        // noinspection unchecked,rawtypes,rawtypes
         final NonFungibleToken bobsBmw = moveCarTo(
-                (TokenPointer) alicesBmw.getIssuedTokenType().getTokenType(),
-                bob.getInfo().getLegalIdentities().get(0))
+                updatedBmw.toPointer(CarTokenType.class),
+                bob.getInfo().getLegalIdentities().get(0),
+                Collections.emptyList())
                 .getCoreTransaction().outputsOfType(NonFungibleToken.class).get(0);
         assertEquals(alicesBmw.getLinearId(), bobsBmw.getLinearId());
         assertEquals(bob.getInfo().getLegalIdentities().get(0), bobsBmw.getHolder());
-        assertEquals(bmw.getLinearId(), updatedBmw.getLinearId());
-        assertEquals("abc126", updatedBmw.getVin());
-        assertEquals("BMW", updatedBmw.getMake());
-        assertEquals(9_000L, updatedBmw.getMileage());
-        assertEquals(21_000L, updatedBmw.getPrice());
+
+        // Bob has the new BMW version because Alice was an observer.
+        final List<StateAndRef<CarTokenType>> carTypes = bob.getServices().getVaultService()
+                .queryBy(CarTokenType.class).getStates();
+        assertEquals(1, carTypes.size());
+        final CarTokenType bmwAccordingToBob = carTypes.get(0).getState().getData();
+        assertEquals(9_000L, bmwAccordingToBob.getMileage());
+        assertEquals(21_000L, bmwAccordingToBob.getPrice());
     }
 
 }
