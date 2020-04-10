@@ -71,6 +71,11 @@ public class RedeemFlowsTests {
         network.stopNodes();
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void inputTokensCannotBeEmpty() {
+        new RedeemFlows.Initiator(Collections.emptyList());
+    }
+
     @Test
     public void SignedTransactionReturnedByTheFlowIsSignedByBothTheIssuerAndTheHolder() throws Throwable {
         final List<StateAndRef<TokenState>> tokens = issueTokens(

@@ -34,7 +34,7 @@ class TokenContractIssueTestsK {
             input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
             output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 10L))
             command(alice.owningKey, TokenContractK.Commands.Issue())
-            `fails with`("No tokens should be consumed when issuing.")
+            `fails with`("No tokens should be consumed, in inputs, when issuing.")
         }
     }
 
@@ -43,7 +43,7 @@ class TokenContractIssueTestsK {
         ledgerServices.transaction {
             output(TOKEN_CONTRACT_ID, DummyState())
             command(alice.owningKey, TokenContractK.Commands.Issue())
-            `fails with`("There should be issued tokens.")
+            `fails with`("There should be issued tokens, in outputs.")
         }
     }
 

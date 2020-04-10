@@ -30,6 +30,12 @@ object IssueFlowsK {
          */
         constructor(holder: Party, quantity: Long) : this(listOf(Pair(holder, quantity)))
 
+        init {
+            require(heldQuantities.isNotEmpty()) { "heldQuantities cannot be empty" }
+            val noneZero = heldQuantities.none { it.second <= 0 }
+            require(noneZero) { "heldQuantities must all be above 0" }
+        }
+
         @Suppress("ClassName")
         companion object {
             object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on parameters.")

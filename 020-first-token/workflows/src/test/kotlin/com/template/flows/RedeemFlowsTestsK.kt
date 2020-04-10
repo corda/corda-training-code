@@ -55,6 +55,13 @@ class RedeemFlowsTestsK {
     fun tearDown() = network.stopNodes()
 
     @Test
+    fun `input tokens cannot be empty`() {
+        assertFailsWith<IllegalArgumentException> {
+            RedeemFlowsK.Initiator(emptyList())
+        }
+    }
+
+    @Test
     fun `SignedTransaction returned by the flow is signed by both the issuer and the holder`() {
         val tokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
 

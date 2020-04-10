@@ -39,7 +39,7 @@ public class TokenContractIssueTests {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
             tx.command(alice.getOwningKey(), new TokenContract.Commands.Issue());
-            tx.failsWith("No tokens should be consumed when issuing.");
+            tx.failsWith("No tokens should be consumed, in inputs, when issuing.");
             return null;
         });
     }
@@ -49,7 +49,7 @@ public class TokenContractIssueTests {
         transaction(ledgerServices, tx -> {
             tx.output(TOKEN_CONTRACT_ID, new DummyState());
             tx.command(alice.getOwningKey(), new TokenContract.Commands.Issue());
-            tx.failsWith("There should be issued tokens.");
+            tx.failsWith("There should be issued tokens, in outputs.");
             return null;
         });
     }

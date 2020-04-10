@@ -11,6 +11,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -36,6 +37,22 @@ class IssueFlowsTestsK {
 
     @After
     fun tearDown() = network.stopNodes()
+
+    @Test
+    fun `held quantities cannot be empty`() {
+        assertFailsWith<IllegalArgumentException> {
+            IssueFlowsK.Initiator(emptyList())
+        }
+    }
+
+    @Test
+    fun `held quantities cannot have any zero quantity`() {
+        assertFailsWith<IllegalArgumentException> {
+            IssueFlowsK.Initiator(listOf(
+                    NodeHolding(alice, 10L).toPair(),
+                    NodeHolding(bob, 0L).toPair()))
+        }
+    }
 
     @Test
     fun `SignedTransaction returned by the flow is signed by the issuer`() {

@@ -30,6 +30,9 @@ object RedeemFlowsK {
             private val inputTokens: List<StateAndRef<TokenStateK>>,
             override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
 
+        init {
+            require(inputTokens.isNotEmpty()) { "inputTokens cannot be empty" }
+        }
         @Suppress("ClassName")
         companion object {
             object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on parameters.")

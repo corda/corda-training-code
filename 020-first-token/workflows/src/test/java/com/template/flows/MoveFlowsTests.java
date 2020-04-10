@@ -51,6 +51,29 @@ public class MoveFlowsTests {
         network.stopNodes();
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void inputTokensCannotBeEmpty() {
+        new MoveFlows.Initiator(Collections.emptyList(), Arrays.asList(
+                createFrom(alice, dan, 10L),
+                createFrom(carly, bob, 20L)));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void outputTokensCannotBeEmpty() throws Throwable {
+        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(
+                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+        new MoveFlows.Initiator(issuedTokens, Collections.emptyList());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void outputTokensCannotHaveAnyZeroQuantity() throws Throwable {
+        final List<StateAndRef<TokenState>> issuedTokens = issueTokens(
+                alice, network, Collections.singletonList(new FlowHelpers.NodeHolding(bob, 10L)));
+        new MoveFlows.Initiator(issuedTokens, Arrays.asList(
+                createFrom(alice, dan, 10L),
+                createFrom(carly, bob, 0L)));
+    }
+
     @Test(expected = FlowException.class)
     public void flowFailsWhenInitiatorIsMissingTransactionsTheyWereNotPartyTo() throws Throwable {
         final List<StateAndRef<TokenState>> issuedTokens = issueTokens(

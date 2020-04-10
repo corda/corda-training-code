@@ -41,6 +41,33 @@ class MoveFlowsTestsK {
     fun tearDown() = network.stopNodes()
 
     @Test
+    fun `input tokens cannot be empty`() {
+        assertFailsWith<IllegalArgumentException> {
+            MoveFlowsK.Initiator(emptyList(), listOf(
+                    createFrom(alice, dan, 10L),
+                    createFrom(carly, bob, 20L)))
+        }
+    }
+
+    @Test
+    fun outputTokensCannotBeEmpty() {
+        val issuedTokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+        assertFailsWith<IllegalArgumentException> {
+            MoveFlowsK.Initiator(issuedTokens, emptyList())
+        }
+    }
+
+    @Test
+    fun outputTokensCannotHaveAnyZeroQuantity() {
+        val issuedTokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
+        assertFailsWith<IllegalArgumentException> {
+            MoveFlowsK.Initiator(issuedTokens, listOf(
+                    createFrom(alice, dan, 10L),
+                    createFrom(carly, bob, 0L)))
+        }
+    }
+
+    @Test
     fun `flow fails when initiator is missing transactions they were not party to`() {
         val issuedTokens = alice.issueTokens(network, listOf(NodeHolding(bob, 10L)))
                 .plus(carly.issueTokens(network, listOf(NodeHolding(dan, 20L))))

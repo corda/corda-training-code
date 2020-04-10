@@ -35,6 +35,13 @@ object MoveFlowsK {
             private val outputTokens: List<TokenStateK>,
             override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
 
+        init {
+            require(inputTokens.isNotEmpty()) { "inputTokens cannot be empty" }
+            require(outputTokens.isNotEmpty()) { "outputTokens cannot be empty" }
+            val noneZero = outputTokens.none { it.quantity <= 0 }
+            require(noneZero) { "outputTokens quantities must all be above 0" }
+        }
+
         @Suppress("ClassName")
         companion object {
             object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on parameters.")

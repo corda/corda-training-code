@@ -33,7 +33,7 @@ class TokenContractRedeemTestsK {
             input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
             output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 10L))
             command(listOf(alice.owningKey, bob.owningKey), TokenContractK.Commands.Redeem())
-            `fails with`("No tokens should be issued when redeeming.")
+            `fails with`("No tokens should be issued, in outputs, when redeeming.")
         }
     }
 
@@ -42,7 +42,7 @@ class TokenContractRedeemTestsK {
         ledgerServices.transaction {
             input(TOKEN_CONTRACT_ID, DummyState())
             command(alice.owningKey, TokenContractK.Commands.Redeem())
-            `fails with`("There should be tokens to redeem.")
+            `fails with`("There should be tokens to redeem, in inputs.")
         }
     }
 

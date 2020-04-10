@@ -47,6 +47,18 @@ public class IssueFlowsTests {
         network.stopNodes();
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void heldQuantitiesCannotBeEmpty() {
+        new IssueFlows.Initiator(Collections.emptyList());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void heldQuantitiesCannotHaveAnyZeroQuantity() {
+        new IssueFlows.Initiator(Arrays.asList(
+                new FlowHelpers.NodeHolding(alice, 10L).toPair(),
+                new FlowHelpers.NodeHolding(bob, 0L).toPair()));
+    }
+
     @Test
     public void signedTransactionReturnedByTheFlowIsSignedByTheIssuer() throws Exception {
         final IssueFlows.Initiator flow = new IssueFlows.Initiator(bob.getInfo().getLegalIdentities().get(0), 10L);

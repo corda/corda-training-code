@@ -76,6 +76,7 @@ public interface RedeemFlows {
                          @NotNull final ProgressTracker progressTracker) {
             //noinspection ConstantConditions
             if (inputTokens == null) throw new NullPointerException("inputTokens cannot be null");
+            if (inputTokens.isEmpty()) throw new IllegalArgumentException("inputTokens cannot be empty");
             //noinspection ConstantConditions
             if (progressTracker == null) throw new NullPointerException("progressTracker cannot be null");
             this.inputTokens = ImmutableList.copyOf(inputTokens);

@@ -39,8 +39,8 @@ public final class TokenContract implements Contract {
         if (command.getValue() instanceof Commands.Issue) {
             requireThat(req -> {
                 // Constraints on the shape of the transaction.
-                req.using("No tokens should be consumed when issuing.", inputs.isEmpty());
-                req.using("There should be issued tokens.", !outputs.isEmpty());
+                req.using("No tokens should be consumed, in inputs, when issuing.", inputs.isEmpty());
+                req.using("There should be issued tokens, in outputs.", !outputs.isEmpty());
 
                 // Constraints on the issued tokens themselves.
                 req.using("All quantities must be above 0.", hasAllPositiveQuantities);
@@ -58,14 +58,14 @@ public final class TokenContract implements Contract {
         } else if (command.getValue() instanceof Commands.Move) {
             requireThat(req -> {
                 // Constraints on the shape of the transaction.
-                req.using("There should be tokens to move.", !inputs.isEmpty());
-                req.using("There should be moved tokens.", !outputs.isEmpty());
+                req.using("There should be tokens to move, in inputs.", !inputs.isEmpty());
+                req.using("There should be moved tokens, in outputs.", !outputs.isEmpty());
 
                 // Constraints on the redeemed tokens themselves.
                 req.using("All quantities must be above 0.", hasAllPositiveQuantities);
                 final Map<Party, Long> inputSums = TokenStateUtilities.mapSumByIssuer(inputs);
                 final Map<Party, Long> outputSums = TokenStateUtilities.mapSumByIssuer(outputs);
-                req.using("Consumed and created issuers should be identical.",
+                req.using("The list of issuers should be conserved.",
                         inputSums.keySet().equals(outputSums.keySet()));
                 req.using("The sum of quantities for each issuer should be conserved.",
                         inputSums.entrySet().stream()
@@ -80,8 +80,8 @@ public final class TokenContract implements Contract {
         } else if (command.getValue() instanceof Commands.Redeem) {
             requireThat(req -> {
                 // Constraints on the shape of the transaction.
-                req.using("There should be tokens to redeem.", !inputs.isEmpty());
-                req.using("No tokens should be issued when redeeming.", outputs.isEmpty());
+                req.using("There should be tokens to redeem, in inputs.", !inputs.isEmpty());
+                req.using("No tokens should be issued, in outputs, when redeeming.", outputs.isEmpty());
 
                 // Constraints on the redeemed tokens themselves.
                 req.using("All quantities must be above 0.", hasAllPositiveQuantities);

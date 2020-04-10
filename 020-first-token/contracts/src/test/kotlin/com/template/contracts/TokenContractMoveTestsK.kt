@@ -34,7 +34,7 @@ class TokenContractMoveTestsK {
         ledgerServices.transaction {
             output(TOKEN_CONTRACT_ID, TokenStateK(alice, carly, 10L))
             command(alice.owningKey, TokenContractK.Commands.Move())
-            `fails with`("There should be tokens to move.")
+            `fails with`("There should be tokens to move, in inputs.")
         }
     }
 
@@ -43,7 +43,7 @@ class TokenContractMoveTestsK {
         ledgerServices.transaction {
             input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
             command(bob.owningKey, TokenContractK.Commands.Move())
-            `fails with`("There should be moved tokens.")
+            `fails with`("There should be moved tokens, in outputs.")
         }
     }
 
@@ -101,7 +101,7 @@ class TokenContractMoveTestsK {
             input(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 10L))
             output(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 10L))
             command(bob.owningKey, TokenContractK.Commands.Move())
-            `fails with`("Consumed and created issuers should be identical.")
+            `fails with`("The list of issuers should be conserved.")
         }
     }
 
@@ -112,7 +112,7 @@ class TokenContractMoveTestsK {
             input(TOKEN_CONTRACT_ID, TokenStateK(carly, bob, 10L))
             output(TOKEN_CONTRACT_ID, TokenStateK(alice, bob, 20L))
             command(bob.owningKey, TokenContractK.Commands.Move())
-            `fails with`("Consumed and created issuers should be identical.")
+            `fails with`("The list of issuers should be conserved.")
         }
     }
 

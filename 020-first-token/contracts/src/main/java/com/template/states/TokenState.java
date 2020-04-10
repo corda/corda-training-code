@@ -50,7 +50,8 @@ public final class TokenState implements ContractState {
         return quantity;
     }
 
-    // equals, hashcode and toString are not strictly necessary, although they come in handy in our unit tests.
+    // Forgetting equals and hashcode will cause all sorts of nasty side effects, as we are likely to put instances
+    // in Sets or HashMaps. You always want to be able to know whether 2 instances are the same anyway.
 
     @Override
     public boolean equals(final Object o) {

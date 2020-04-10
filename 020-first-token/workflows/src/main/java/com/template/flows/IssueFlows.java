@@ -63,6 +63,9 @@ public interface IssueFlows {
         public Initiator(@NotNull final List<Pair<Party, Long>> heldQuantities) {
             //noinspection ConstantConditions
             if (heldQuantities == null) throw new NullPointerException("heldQuantities cannot be null");
+            if (heldQuantities.isEmpty()) throw new IllegalArgumentException("heldQuantities cannot be empty");
+            final boolean noneZero = heldQuantities.stream().noneMatch(heldQuantity -> heldQuantity.getValue() <= 0);
+            if (!noneZero) throw new IllegalArgumentException("heldQuantities must all be above 0");
             this.heldQuantities = ImmutableList.copyOf(heldQuantities);
             this.progressTracker = tracker();
         }

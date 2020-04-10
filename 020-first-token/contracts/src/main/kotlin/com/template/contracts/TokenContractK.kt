@@ -26,8 +26,8 @@ class TokenContractK : Contract {
         when (command.value) {
             is Commands.Issue -> requireThat {
                 // Constraints on the shape of the transaction.
-                "No tokens should be consumed when issuing." using inputs.isEmpty()
-                "There should be issued tokens." using outputs.isNotEmpty()
+                "No tokens should be consumed, in inputs, when issuing." using inputs.isEmpty()
+                "There should be issued tokens, in outputs." using outputs.isNotEmpty()
 
                 // Constraints on the issued tokens themselves.
                 "All quantities must be above 0." using hasAllPositiveQuantities
@@ -39,14 +39,14 @@ class TokenContractK : Contract {
 
             is Commands.Move -> requireThat {
                 // Constraints on the shape of the transaction.
-                "There should be tokens to move." using inputs.isNotEmpty()
-                "There should be moved tokens." using outputs.isNotEmpty()
+                "There should be tokens to move, in inputs." using inputs.isNotEmpty()
+                "There should be moved tokens, in outputs." using outputs.isNotEmpty()
 
                 // Constraints on the moved tokens themselves.
                 "All quantities must be above 0." using hasAllPositiveQuantities
                 val inputSums = inputs.mapSumByIssuer()
                 val outputSums = outputs.mapSumByIssuer()
-                "Consumed and created issuers should be identical." using (inputSums.keys == outputSums.keys)
+                "The list of issuers should be conserved." using (inputSums.keys == outputSums.keys)
                 "The sum of quantities for each issuer should be conserved." using inputSums.all { outputSums[it.key] == it.value }
 
                 // Constraints on the signers.
@@ -55,8 +55,8 @@ class TokenContractK : Contract {
 
             is Commands.Redeem -> requireThat {
                 // Constraints on the shape of the transaction.
-                "There should be tokens to redeem." using inputs.isNotEmpty()
-                "No tokens should be issued when redeeming." using outputs.isEmpty()
+                "There should be tokens to redeem, in inputs." using inputs.isNotEmpty()
+                "No tokens should be issued, in outputs, when redeeming." using outputs.isEmpty()
 
                 // Constraints on the redeemed tokens themselves.
                 "All quantities must be above 0." using hasAllPositiveQuantities

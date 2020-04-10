@@ -85,12 +85,16 @@ public interface MoveFlows {
                 @NotNull final ProgressTracker progressTracker) {
             //noinspection ConstantConditions
             if (inputTokens == null) throw new NullPointerException("inputTokens cannot be null");
-            this.inputTokens = inputTokens;
+            if (inputTokens.isEmpty()) throw new IllegalArgumentException("inputTokens cannot be empty");
             //noinspection ConstantConditions
             if (outputTokens == null) throw new NullPointerException("outputTokens cannot be null");
-            this.outputTokens = outputTokens;
+            if (outputTokens.isEmpty()) throw new IllegalArgumentException("outputTokens cannot be empty");
+            final boolean noneZero = outputTokens.stream().noneMatch(outputToken -> outputToken.getQuantity() <= 0);
+            if (!noneZero) throw new IllegalArgumentException("outputTokens quantities must all be above 0");
             //noinspection ConstantConditions
             if (progressTracker == null) throw new NullPointerException("progressTracker cannot be null");
+            this.inputTokens = inputTokens;
+            this.outputTokens = outputTokens;
             this.progressTracker = progressTracker;
         }
 

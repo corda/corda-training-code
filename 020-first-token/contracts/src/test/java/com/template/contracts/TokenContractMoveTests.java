@@ -39,7 +39,7 @@ public class TokenContractMoveTests {
         transaction(ledgerServices, tx -> {
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, carly, 10L));
             tx.command(alice.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("There should be tokens to move.");
+            tx.failsWith("There should be tokens to move, in inputs.");
             return null;
         });
     }
@@ -49,7 +49,7 @@ public class TokenContractMoveTests {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
             tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("There should be moved tokens.");
+            tx.failsWith("There should be moved tokens, in outputs.");
             return null;
         });
     }
@@ -112,7 +112,7 @@ public class TokenContractMoveTests {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(carly, bob, 10L));
             tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("Consumed and created issuers should be identical.");
+            tx.failsWith("The list of issuers should be conserved.");
             return null;
         });
     }
@@ -124,7 +124,7 @@ public class TokenContractMoveTests {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(carly, bob, 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 20L));
             tx.command(bob.getOwningKey(), new TokenContract.Commands.Move());
-            tx.failsWith("Consumed and created issuers should be identical.");
+            tx.failsWith("The list of issuers should be conserved.");
             return null;
         });
     }

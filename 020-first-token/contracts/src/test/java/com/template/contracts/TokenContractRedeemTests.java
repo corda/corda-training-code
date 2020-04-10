@@ -38,7 +38,7 @@ public class TokenContractRedeemTests {
             tx.input(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
             tx.output(TOKEN_CONTRACT_ID, new TokenState(alice, bob, 10L));
             tx.command(Arrays.asList(alice.getOwningKey(), bob.getOwningKey()), new TokenContract.Commands.Redeem());
-            tx.failsWith("No tokens should be issued when redeeming.");
+            tx.failsWith("No tokens should be issued, in outputs, when redeeming.");
             return null;
         });
     }
@@ -48,7 +48,7 @@ public class TokenContractRedeemTests {
         transaction(ledgerServices, tx -> {
             tx.input(TOKEN_CONTRACT_ID, new DummyState());
             tx.command(alice.getOwningKey(), new TokenContract.Commands.Redeem());
-            tx.failsWith("There should be tokens to redeem.");
+            tx.failsWith("There should be tokens to redeem, in inputs.");
             return null;
         });
     }
