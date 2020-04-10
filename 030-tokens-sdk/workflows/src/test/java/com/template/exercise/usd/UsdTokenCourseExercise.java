@@ -7,13 +7,14 @@ import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.MockNetwork;
 import net.corda.testing.node.MockNodeParameters;
 import net.corda.testing.node.StartedMockNode;
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.List;
 
-import static com.template.flows.FlowTestHelpers.prepareMockNetworkParameters;
+import static com.template.exercise.usd.UsdTokenCourseHelpers.prepareMockNetworkParameters;
 import static org.junit.Assert.assertEquals;
 
 public class UsdTokenCourseExercise {
@@ -41,6 +42,7 @@ public class UsdTokenCourseExercise {
     }
 
     @SuppressWarnings("UnusedReturnValue")
+    @NotNull
     private SignedTransaction mintIssues100ToAlice() throws Exception {
         final IssueUsdFlow flow = new IssueUsdFlow(alice.getInfo().getLegalIdentities().get(0), 100L);
         final CordaFuture<SignedTransaction> future = usMint.startFlow(flow);
@@ -49,6 +51,7 @@ public class UsdTokenCourseExercise {
     }
 
     @SuppressWarnings("UnusedReturnValue")
+    @NotNull
     private SignedTransaction aliceMoves50ToBob() throws Exception {
         final MoveUsdFlow flow = new MoveUsdFlow(bob.getInfo().getLegalIdentities().get(0), 50L);
         final CordaFuture<SignedTransaction> future = alice.startFlow(flow);
@@ -57,6 +60,7 @@ public class UsdTokenCourseExercise {
     }
 
     @SuppressWarnings("UnusedReturnValue")
+    @NotNull
     private SignedTransaction bobRedeems25() throws Exception {
         final RedeemUsdFlow flow = new RedeemUsdFlow(25L);
         final CordaFuture<SignedTransaction> future = bob.startFlow(flow);
