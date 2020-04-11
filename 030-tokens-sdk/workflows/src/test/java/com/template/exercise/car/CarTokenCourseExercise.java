@@ -152,10 +152,10 @@ public class CarTokenCourseExercise {
         assertEquals(22_000L, updatedBmw.getPrice());
 
         // Alice still has the old version because it was not an observer.
-        final List<StateAndRef<CarTokenType>> carTypes = alice.getServices().getVaultService()
+        final List<StateAndRef<CarTokenType>> aliceCarTypes = alice.getServices().getVaultService()
                 .queryBy(CarTokenType.class).getStates();
-        assertEquals(1, carTypes.size());
-        final CarTokenType bmwAccordingToAlice = carTypes.get(0).getState().getData();
+        assertEquals(1, aliceCarTypes.size());
+        final CarTokenType bmwAccordingToAlice = aliceCarTypes.get(0).getState().getData();
         assertEquals(0L, bmwAccordingToAlice.getMileage());
         assertEquals(30_000L, bmwAccordingToAlice.getPrice());
     }
