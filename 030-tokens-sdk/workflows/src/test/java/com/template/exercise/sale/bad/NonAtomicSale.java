@@ -72,6 +72,8 @@ public interface NonAtomicSale {
             // TODO check we were paid indeed
             // Shall we continue or do we disappear with the money?
 
+            // An exception could also happen here leaving the buyer without their money or car.
+
             // Move the car to the buyer.
             final PartyAndToken carForBuyer = new PartyAndToken(buyer, car);
             final QueryCriteria myCarCriteria = QueryUtilitiesKt.heldTokenAmountCriteria(

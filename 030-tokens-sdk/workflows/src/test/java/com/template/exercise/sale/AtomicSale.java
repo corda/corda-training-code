@@ -1,7 +1,9 @@
 package com.template.exercise.sale;
 
 import co.paralleluniverse.fibers.Suspendable;
+import com.r3.corda.lib.tokens.contracts.commands.MoveTokenCommand;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
+import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
@@ -10,14 +12,12 @@ import com.r3.corda.lib.tokens.selection.TokenQueryBy;
 import com.r3.corda.lib.tokens.selection.database.selector.DatabaseTokenSelection;
 import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensUtilitiesKt;
 import com.r3.corda.lib.tokens.workflows.internal.flows.distribution.UpdateDistributionListFlow;
-import com.r3.corda.lib.tokens.workflows.types.PartyAndAmount;
 import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
 import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
 import com.template.exercise.car.CarTokenCourseHelpers;
 import com.template.exercise.car.CarTokenType;
 import kotlin.Pair;
-import net.corda.core.contracts.Amount;
-import net.corda.core.contracts.StateAndRef;
+import net.corda.core.contracts.*;
 import net.corda.core.crypto.SecureHash;
 import net.corda.core.flows.*;
 import net.corda.core.identity.Party;
@@ -27,9 +27,13 @@ import net.corda.core.transactions.TransactionBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.r3.corda.lib.tokens.selection.database.config.DatabaseSelectionConfigKt.*;
+import static com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt.heldTokenCriteria;
 
 public interface AtomicSale {
 
@@ -55,7 +59,6 @@ public interface AtomicSale {
             this.issuedCurrency = issuedCurrency;
         }
 
-
         @Suspendable
         @Override
         @NotNull
@@ -63,11 +66,16 @@ public interface AtomicSale {
             // Fetch the latest known state.
             final StateAndRef<CarTokenType> carInfo = car.getPointer().resolve(getServiceHub());
             final long price = carInfo.getState().getData().getPrice();
+            final QueryCriteria tokenCriteria = heldTokenCriteria(car);
+            final List<StateAndRef<NonFungibleToken>> nonFungibleTokens = getServiceHub().getVaultService()
+                    .queryBy(NonFungibleToken.class, tokenCriteria).getStates();
+            if (nonFungibleTokens.size() != 1) throw new FlowException("NonFungibleToken not found");
 
             final FlowSession buyerSession = initiateFlow(buyer);
 
             // Send the car information to the buyer. A bit ahead of time so that it can fetch states while we do too.
             subFlow(new SendStateAndRefFlow(buyerSession, Collections.singletonList(carInfo)));
+            subFlow(new SendStateAndRefFlow(buyerSession, nonFungibleTokens));
 
             // Send the currency desired.
             buyerSession.send(issuedCurrency);
@@ -80,17 +88,25 @@ public interface AtomicSale {
 
             // Create a proposal to move the car token to Bob.
             final PartyAndToken carForBuyer = new PartyAndToken(buyer, car);
-            final QueryCriteria carOwnedBySeller = QueryUtilitiesKt.heldTokenAmountCriteria(car, getOurIdentity());
-            MoveTokensUtilitiesKt.addMoveNonFungibleTokens(txBuilder, getServiceHub(), carForBuyer, carOwnedBySeller);
+            MoveTokensUtilitiesKt.addMoveNonFungibleTokens(txBuilder, getServiceHub(), carForBuyer, null);
 
             // Receive the currency states that will go in input.
             final List<StateAndRef<FungibleToken>> currencyInputs = subFlow(new ReceiveStateAndRefFlow<>(buyerSession));
+            // Here we do not care much about the inputs. We expect that any error will be caught by the contract.
 
             // Receive the currency states that will go in output.
-            //noinspection unchecked
+            // noinspection unchecked
             final List<FungibleToken> currencyOutputs = buyerSession.receive(List.class).unwrap(it -> it);
-
-            // TODO Make sure these inputs / outputs get us paid at least the car price in the right issued currency.
+            final long sumPaid = currencyOutputs.stream()
+                    // Are they owned by the seller (in the future)? We don't care about the "change".
+                    .filter(it -> it.getHolder().equals(getOurIdentity()))
+                    .map(FungibleToken::getAmount)
+                    // Are they of the expected currency?
+                    .filter(it -> it.getToken().equals(issuedCurrency))
+                    .map(issuedTokenTypeAmount -> issuedTokenTypeAmount.getQuantity() / 100)
+                    .reduce(0L, Math::addExact);
+            if (sumPaid < price)
+                throw new FlowException("We were paid only " + sumPaid + " instead of the expected " + price);
 
             // Put those currency states where they belong.
             MoveTokensUtilitiesKt.addMoveTokens(txBuilder, currencyInputs, currencyOutputs);
@@ -109,11 +125,13 @@ public interface AtomicSale {
         }
     }
 
+    @SuppressWarnings("unused")
     @InitiatedBy(CarSeller.class)
     class CarBuyer extends FlowLogic<SignedTransaction> {
         @NotNull
         private final FlowSession sellerSession;
 
+        @SuppressWarnings("unused")
         public CarBuyer(@NotNull final FlowSession sellerSession) {
             this.sellerSession = sellerSession;
         }
@@ -122,11 +140,17 @@ public interface AtomicSale {
         @Override
         @NotNull
         public SignedTransaction call() throws FlowException {
-            // Receive the car information.
+            // Receive the car information. We will resolve the car type right after, from the NonFungibleToken, but
+            // we have to receive for now.
             final List<StateAndRef<CarTokenType>> carInfos = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
-            if (carInfos.size() != 1) throw new FlowException("We expected a single car");
+            if (carInfos.size() != 1) throw new FlowException("We expected a single car type");
             final StateAndRef<CarTokenType> carInfo = carInfos.get(0);
+            // Receive the car information.
+            final List<StateAndRef<NonFungibleToken>> heldCarInfos = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
+            if (heldCarInfos.size() != 1) throw new FlowException("We expected a single held car");
+            final StateAndRef<NonFungibleToken> heldCarInfo = heldCarInfos.get(0);
             final long price = carInfo.getState().getData().getPrice();
+            // TODO have an internal check that this is indeed the car we intend to buy.
 
             // Receive the currency information.
             final IssuedTokenType issuedCurrency = sellerSession.receive(IssuedTokenType.class).unwrap(it -> it);
@@ -137,8 +161,6 @@ public interface AtomicSale {
             final QueryCriteria properlyIssued = QueryUtilitiesKt.tokenAmountWithIssuerCriteria(
                     issuedCurrency.getTokenType(), issuedCurrency.getIssuer());
             final Amount<TokenType> priceInCurrency = AmountUtilitiesKt.amount(price, issuedCurrency.getTokenType());
-            final PartyAndAmount<TokenType> priceForNewHolder = new PartyAndAmount<>(
-                    sellerSession.getCounterparty(), priceInCurrency);
             // Generate the buyer's currency inputs, to be spent, and the outputs, the currency tokens that will be
             // held by Alice.
             final DatabaseTokenSelection tokenSelection = new DatabaseTokenSelection(
@@ -149,7 +171,7 @@ public interface AtomicSale {
                     new TokenQueryBy(issuedCurrency.getIssuer(), it -> true, heldByMe.and(properlyIssued)),
                     getRunId().getUuid());
 
-            // Send the currency states that will go in input.
+            // Send the currency states that will go in input, along with their history.
             subFlow(new SendStateAndRefFlow(sellerSession, inputsAndOutputs.getFirst()));
 
             // Send the currency states that will go in output.
@@ -158,8 +180,60 @@ public interface AtomicSale {
             // Sign the received transaction.
             final SecureHash signedTxId = subFlow(new SignTransactionFlow(sellerSession) {
                 @Override
+                // There is an opportunity for a malicious seller to ask the buyer for information, and then ask them
+                // to sign a different transaction. So we have to be careful.
+                // Make sure this is the transaction we expect: car, price and states we sent.
                 protected void checkTransaction(@NotNull SignedTransaction stx) throws FlowException {
-                    // TODO Make sure this is the transaction we expect: car, price and states we sent.
+                    // Recall the inputs we prepared in the first part of the flow.
+                    final Set<StateRef> allKnownInputs = inputsAndOutputs.getFirst().stream()
+                            .map(StateAndRef::getRef)
+                            .collect(Collectors.toSet());
+                    // There should be no extra inputs, other than the car.
+                    allKnownInputs.add(heldCarInfo.getRef());
+                    final Set<StateRef> allInputs = new HashSet<>(stx.getInputs());
+                    if (!allInputs.equals(allKnownInputs))
+                        throw new FlowException("Inconsistency in input refs compared to expectation");
+
+                    // Seller should own the currency We should own the change.
+                    final List<ContractState> allOutputs = stx.getCoreTransaction().getOutputStates();
+                    // Let's not pass any unexpected count of outputs.
+                    if (allOutputs.size() != inputsAndOutputs.getSecond().size() + 1)
+                        throw new FlowException("Wrong count of outputs");
+
+                    // If we keep only those of the proper currency.
+                    final Set<FungibleToken> allCurrencyOutputs = allOutputs.stream()
+                            .filter(it -> it instanceof FungibleToken)
+                            .map(it -> (FungibleToken) it)
+                            .filter(it -> it.getIssuedTokenType().equals(issuedCurrency))
+                            .collect(Collectors.toSet());
+                    // Let's not pass if we don't recognise the states we gave.
+                    if (!new HashSet<>(inputsAndOutputs.getSecond()).equals(allCurrencyOutputs))
+                        throw new FlowException("Inconsistency in FungibleToken outputs compare to expectation");
+
+                    // If we keep only the car tokens.
+                    final List<NonFungibleToken> allCarOutputs = allOutputs.stream()
+                            .filter(it -> it instanceof NonFungibleToken)
+                            .map(it -> (NonFungibleToken) it)
+                            .collect(Collectors.toList());
+                    // Let's not pass if there is not exactly 1 car.
+                    if (allCarOutputs.size() != 1) throw new FlowException("Wrong count of car outputs");
+                    // And it has to be the car we expect.
+                    final NonFungibleToken outputHeldCar = allCarOutputs.get(0);
+                    if (!outputHeldCar.getLinearId().equals(heldCarInfo.getState().getData().getLinearId()))
+                        throw new FlowException("This is not the car we expected");
+                    if (!outputHeldCar.getHolder().equals(getOurIdentity()))
+                        throw new FlowException("The car is not held by us in output");
+
+                    // There should only be 2 move commands.
+                    final List<Command<?>> commands = stx.getTx().getCommands();
+                    if (commands.size() != 2) throw new FlowException("There are not the 2 expected commands");
+                    final Set<MoveTokenCommand> tokenCommands = commands.stream()
+                            .map(Command::component1)
+                            .filter(it -> it instanceof MoveTokenCommand)
+                            .map(it -> (MoveTokenCommand) it)
+                            .collect(Collectors.toSet());
+                    if (tokenCommands.size() != 2)
+                        throw new FlowException("There are not the 2 expected move commands");
                 }
             }).getId();
 
