@@ -92,7 +92,15 @@ public interface AtomicSale {
 
             // Receive the currency states that will go in input.
             final List<StateAndRef<FungibleToken>> currencyInputs = subFlow(new ReceiveStateAndRefFlow<>(buyerSession));
-            // Here we do not care much about the inputs. We expect that any error will be caught by the contract.
+            // Let's make sure the buyer is not trying to pass off some of our own dollars as payment... After all, we
+            // are going to sign this transaction.
+            final long ourCurrencyInputCount = currencyInputs.stream()
+                    .filter(it -> it.getState().getData().getHolder().equals(getOurIdentity()))
+                    .count();
+            if (ourCurrencyInputCount != 0)
+                throw new FlowException("The buyer sent us some of our token states: " + ourCurrencyInputCount);
+            // Other than that, we do not care much about the inputs as we expect that any error will be caught by the
+            // contract.
 
             // Receive the currency states that will go in output.
             // noinspection unchecked
@@ -105,6 +113,7 @@ public interface AtomicSale {
                     .filter(it -> it.getToken().equals(issuedCurrency))
                     .map(issuedTokenTypeAmount -> issuedTokenTypeAmount.getQuantity() / 100)
                     .reduce(0L, Math::addExact);
+            // Make sure we are paid.
             if (sumPaid < price)
                 throw new FlowException("We were paid only " + sumPaid + " instead of the expected " + price);
 
@@ -114,7 +123,7 @@ public interface AtomicSale {
             // Sign the transaction and send it to buyer for signature.
             final SignedTransaction partSignedTx = getServiceHub().signInitialTransaction(txBuilder,
                     getOurIdentity().getOwningKey());
-            SignedTransaction fullySignedTx = subFlow(new CollectSignaturesFlow(partSignedTx,
+            final SignedTransaction fullySignedTx = subFlow(new CollectSignaturesFlow(partSignedTx,
                     Collections.singletonList(buyerSession)));
 
             // Distribute updates of the evolvable car token.
@@ -162,6 +171,8 @@ public interface AtomicSale {
             // Receive the currency information.
             final IssuedTokenType issuedCurrency = sellerSession.receive(IssuedTokenType.class).unwrap(it -> it);
 
+            // TODO have an internal check that this is indeed the currency we decided to use in the sale.
+
             // Assemble the currency states.
             final QueryCriteria heldByMe = QueryUtilitiesKt.heldTokenAmountCriteria(
                     issuedCurrency.getTokenType(), getOurIdentity());
@@ -173,7 +184,7 @@ public interface AtomicSale {
             // held by Alice.
             final DatabaseTokenSelection tokenSelection = new DatabaseTokenSelection(
                     getServiceHub(), MAX_RETRIES_DEFAULT, RETRY_SLEEP_DEFAULT, RETRY_CAP_DEFAULT, PAGE_SIZE_DEFAULT);
-            Pair<List<StateAndRef<FungibleToken>>, List<FungibleToken>> inputsAndOutputs = tokenSelection.generateMove(
+            final Pair<List<StateAndRef<FungibleToken>>, List<FungibleToken>> inputsAndOutputs = tokenSelection.generateMove(
                     Collections.singletonList(new Pair<>(sellerSession.getCounterparty(), priceInCurrency)),
                     getOurIdentity(),
                     new TokenQueryBy(issuedCurrency.getIssuer(), it -> true, heldByMe.and(properlyIssued)),
@@ -202,7 +213,7 @@ public interface AtomicSale {
                     if (!allInputs.equals(allKnownInputs))
                         throw new FlowException("Inconsistency in input refs compared to expectation");
 
-                    // Seller should own the currency We should own the change.
+                    // Moving on to the outputs.
                     final List<ContractState> allOutputs = stx.getCoreTransaction().getOutputStates();
                     // Let's not pass any unexpected count of outputs.
                     if (allOutputs.size() != inputsAndOutputs.getSecond().size() + 1)

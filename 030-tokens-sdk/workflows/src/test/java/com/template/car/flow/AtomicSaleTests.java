@@ -150,7 +150,9 @@ public class AtomicSaleTests {
         final Amount<IssuedTokenType> aliceReceived = Amount.sumOrThrow(aliceUsdTokens.stream()
                 .map(FungibleToken::getAmount)
                 .collect(Collectors.toList()));
-        assertEquals(21_000_00L, aliceReceived.getQuantity());
+        assertEquals(
+                AmountUtilitiesKt.amount(21_000L, usdTokenType).getQuantity(),
+                aliceReceived.getQuantity());
 
         // Bob got the car
         final List<NonFungibleToken> bobCarTokens = saleTx.getCoreTransaction().outputsOfType(NonFungibleToken.class)
