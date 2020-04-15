@@ -120,8 +120,10 @@ public class AtomicSaleTests {
         final CarTokenType updatedCar = new CarTokenType(bmwType.getMaintainers(), bmwType.getLinearId(),
                 bmwType.getVin(), bmwType.getMake(), nextMileage, nextPrice);
         final UpdateEvolvableToken updateFlow = new UpdateEvolvableToken(bmwRef, updatedCar,
+                // We have to add them as observers because as of now, the DMV was not contacted when issuing to Alice.
+                // See https://github.com/corda/token-sdk/issues/197
                 Arrays.asList(alice.getInfo().getLegalIdentities().get(0),
-                        dmv.getInfo().getLegalIdentities().get(0)));
+                        bmwDealer.getInfo().getLegalIdentities().get(0)));
         final CordaFuture<SignedTransaction> updateFuture = dmv.startFlow(updateFlow);
         network.runNetwork();
         updateFuture.get();

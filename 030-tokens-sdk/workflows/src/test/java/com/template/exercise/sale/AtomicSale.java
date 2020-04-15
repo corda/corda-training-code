@@ -160,6 +160,7 @@ public interface AtomicSale {
                     issuedCurrency.getTokenType(), getOurIdentity());
             final QueryCriteria properlyIssued = QueryUtilitiesKt.tokenAmountWithIssuerCriteria(
                     issuedCurrency.getTokenType(), issuedCurrency.getIssuer());
+            // Have the utility do the "dollars to cents" conversion for us.
             final Amount<TokenType> priceInCurrency = AmountUtilitiesKt.amount(price, issuedCurrency.getTokenType());
             // Generate the buyer's currency inputs, to be spent, and the outputs, the currency tokens that will be
             // held by Alice.
