@@ -6,18 +6,14 @@ import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import net.corda.core.contracts.Amount;
-import net.corda.core.identity.CordaX500Name;
-import net.corda.testing.node.MockNetworkNotarySpec;
 import net.corda.testing.node.MockNetworkParameters;
 import net.corda.testing.node.StartedMockNode;
 import net.corda.testing.node.TestCordapp;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Map;
-
 public interface UsdTokenCourseHelpers {
     @NotNull
-    static MockNetworkParameters prepareMockNetworkParameters() throws Exception {
+    static MockNetworkParameters prepareMockNetworkParameters() {
         return new MockNetworkParameters()
                 .withCordappsForAllNodes(ImmutableList.of(
                         TestCordapp.findCordapp("com.r3.corda.lib.tokens.contracts"),
@@ -27,6 +23,7 @@ public interface UsdTokenCourseHelpers {
                         TestCordapp.findCordapp("com.template.states"),
                         TestCordapp.findCordapp("com.template.flows")));
     }
+
     @NotNull
     static FungibleToken createUsdFungible(
             @NotNull final StartedMockNode issuer,

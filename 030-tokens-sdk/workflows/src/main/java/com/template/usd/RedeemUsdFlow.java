@@ -6,7 +6,6 @@ import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.RedeemFungibleTokens;
 import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
-import com.template.usd.UsdTokenConstants;
 import net.corda.core.contracts.Amount;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;

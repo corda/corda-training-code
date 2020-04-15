@@ -32,7 +32,7 @@ public class CarTokenCourseExercise {
     private final StartedMockNode alice;
     private final StartedMockNode bob;
 
-    public CarTokenCourseExercise() throws Exception {
+    public CarTokenCourseExercise() {
         network = new MockNetwork(prepareMockNetworkParameters());
         notary = network.getDefaultNotaryNode();
         dmv = network.createNode(new MockNodeParameters()
