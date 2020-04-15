@@ -1,7 +1,8 @@
-package com.template.car;
+package com.template.car.flow;
 
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
+import com.template.car.*;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.identity.AbstractParty;
@@ -18,7 +19,7 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.List;
 
-import static com.template.car.CarTokenCourseHelpers.prepareMockNetworkParameters;
+import static com.template.car.flow.CarTokenCourseHelpers.prepareMockNetworkParameters;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 

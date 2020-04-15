@@ -1,7 +1,7 @@
-package com.template.car;
+package com.template.car.flow;
 
 import com.google.common.collect.ImmutableList;
-import com.template.car.CarTokenTypeConstants;
+import com.template.car.flow.CarTokenTypeConstants;
 import net.corda.testing.common.internal.ParametersUtilitiesKt;
 import net.corda.testing.node.MockNetworkNotarySpec;
 import net.corda.testing.node.MockNetworkParameters;

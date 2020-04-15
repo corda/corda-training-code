@@ -1,4 +1,4 @@
-package com.template.car;
+package com.template.car.flow;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.contracts.commands.MoveTokenCommand;
@@ -14,7 +14,6 @@ import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensUtilitiesKt;
 import com.r3.corda.lib.tokens.workflows.internal.flows.distribution.UpdateDistributionListFlow;
 import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
 import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
-import com.template.car.CarTokenTypeConstants;
 import com.template.car.CarTokenType;
 import kotlin.Pair;
 import net.corda.core.contracts.*;
@@ -65,17 +64,18 @@ public interface AtomicSale {
         public SignedTransaction call() throws FlowException {
             // Fetch the latest known state.
             final StateAndRef<CarTokenType> carInfo = car.getPointer().resolve(getServiceHub());
+            // Send the car information to the buyer. A bit ahead of time so that it can fetch states while we do too.
+            final FlowSession buyerSession = initiateFlow(buyer);
+            subFlow(new SendStateAndRefFlow(buyerSession, Collections.singletonList(carInfo)));
+
             final long price = carInfo.getState().getData().getPrice();
             final QueryCriteria tokenCriteria = heldTokenCriteria(car);
-            final List<StateAndRef<NonFungibleToken>> nonFungibleTokens = getServiceHub().getVaultService()
+            final List<StateAndRef<NonFungibleToken>> ownedCarTokens = getServiceHub().getVaultService()
                     .queryBy(NonFungibleToken.class, tokenCriteria).getStates();
-            if (nonFungibleTokens.size() != 1) throw new FlowException("NonFungibleToken not found");
+            if (ownedCarTokens.size() != 1) throw new FlowException("NonFungibleToken not found");
 
-            final FlowSession buyerSession = initiateFlow(buyer);
-
-            // Send the car information to the buyer. A bit ahead of time so that it can fetch states while we do too.
-            subFlow(new SendStateAndRefFlow(buyerSession, Collections.singletonList(carInfo)));
-            subFlow(new SendStateAndRefFlow(buyerSession, nonFungibleTokens));
+            // Send the proof that we own the car.
+            subFlow(new SendStateAndRefFlow(buyerSession, ownedCarTokens));
 
             // Send the currency desired.
             buyerSession.send(issuedCurrency);
@@ -145,11 +145,18 @@ public interface AtomicSale {
             final List<StateAndRef<CarTokenType>> carInfos = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
             if (carInfos.size() != 1) throw new FlowException("We expected a single car type");
             final StateAndRef<CarTokenType> carInfo = carInfos.get(0);
-            // Receive the car information.
+            final long price = carInfo.getState().getData().getPrice();
+            // Receive the owned car information.
             final List<StateAndRef<NonFungibleToken>> heldCarInfos = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
             if (heldCarInfos.size() != 1) throw new FlowException("We expected a single held car");
             final StateAndRef<NonFungibleToken> heldCarInfo = heldCarInfos.get(0);
-            final long price = carInfo.getState().getData().getPrice();
+            // Is this the same car?
+            //noinspection unchecked
+            if (!((TokenPointer<CarTokenType>) heldCarInfo.getState().getData().getTokenType())
+                    .getPointer().getPointer()
+                    .equals(carInfo.getState().getData().getLinearId()))
+                throw new FlowException("The owned car does not correspond to the earlier car info.");
+
             // TODO have an internal check that this is indeed the car we intend to buy.
 
             // Receive the currency information.

@@ -1,4 +1,4 @@
-package com.template.car;
+package com.template.car.flow;
 
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
@@ -10,9 +10,6 @@ import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.CreateEvolvableTokens;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.UpdateEvolvableToken;
-import com.template.car.AtomicSale;
-import com.template.car.CarTokenTypeConstants;
-import com.template.car.CarTokenCourseHelpers;
 import com.template.car.CarTokenType;
 import com.template.usd.UsdTokenConstants;
 import net.corda.core.concurrent.CordaFuture;

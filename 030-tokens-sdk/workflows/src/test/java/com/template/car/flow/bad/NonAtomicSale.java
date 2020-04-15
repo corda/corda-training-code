@@ -1,4 +1,4 @@
-package com.template.car.bad;
+package com.template.car.flow.bad;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;

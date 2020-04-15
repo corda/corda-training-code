@@ -1,4 +1,4 @@
-package com.template.car;
+package com.template.car.flow;
 
 import net.corda.core.identity.CordaX500Name;
 
