@@ -1,4 +1,4 @@
-package com.template.exercise.usd;
+package com.template.usd;
 
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import net.corda.core.concurrent.CordaFuture;
@@ -14,7 +14,7 @@ import org.junit.Test;
 
 import java.util.List;
 
-import static com.template.exercise.usd.UsdTokenCourseHelpers.prepareMockNetworkParameters;
+import static com.template.usd.UsdTokenCourseHelpers.prepareMockNetworkParameters;
 import static org.junit.Assert.assertEquals;
 
 public class UsdTokenCourseExercise {
@@ -26,7 +26,7 @@ public class UsdTokenCourseExercise {
     public UsdTokenCourseExercise() throws Exception {
         network = new MockNetwork(prepareMockNetworkParameters());
         usMint = network.createNode(new MockNodeParameters()
-                .withLegalName(UsdTokenCourseHelpers.US_MINT));
+                .withLegalName(UsdTokenConstants.US_MINT));
         alice = network.createNode();
         bob = network.createNode();
     }

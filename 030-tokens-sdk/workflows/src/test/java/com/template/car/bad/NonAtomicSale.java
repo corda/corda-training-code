@@ -1,4 +1,4 @@
-package com.template.exercise.sale.bad;
+package com.template.car.bad;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
@@ -10,7 +10,7 @@ import com.r3.corda.lib.tokens.workflows.flows.rpc.MoveNonFungibleTokens;
 import com.r3.corda.lib.tokens.workflows.types.PartyAndAmount;
 import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
 import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
-import com.template.exercise.car.CarTokenType;
+import com.template.car.CarTokenType;
 import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.flows.*;

@@ -1,4 +1,4 @@
-package com.template.exercise.car;
+package com.template.car;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.UpdateEvolvableToken;

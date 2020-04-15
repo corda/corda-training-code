@@ -1,4 +1,4 @@
-package com.template.exercise.sale;
+package com.template.car;
 
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
@@ -10,9 +10,11 @@ import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.CreateEvolvableTokens;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.UpdateEvolvableToken;
-import com.template.exercise.car.CarTokenCourseHelpers;
-import com.template.exercise.car.CarTokenType;
-import com.template.exercise.usd.UsdTokenCourseHelpers;
+import com.template.car.AtomicSale;
+import com.template.car.CarTokenTypeConstants;
+import com.template.car.CarTokenCourseHelpers;
+import com.template.car.CarTokenType;
+import com.template.usd.UsdTokenConstants;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.StateAndRef;
@@ -50,11 +52,11 @@ public class AtomicSaleTests {
         network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
         notary = network.getDefaultNotaryNode();
         usMint = network.createNode(new MockNodeParameters()
-                .withLegalName(UsdTokenCourseHelpers.US_MINT));
+                .withLegalName(UsdTokenConstants.US_MINT));
         dmv = network.createNode(new MockNodeParameters()
-                .withLegalName(CarTokenCourseHelpers.DMV));
+                .withLegalName(CarTokenTypeConstants.DMV));
         bmwDealer = network.createNode(new MockNodeParameters()
-                .withLegalName(CarTokenCourseHelpers.BMW_DEALER));
+                .withLegalName(CarTokenTypeConstants.BMW_DEALER));
         alice = network.createNode();
         bob = network.createNode();
         usdTokenType = FiatCurrency.Companion.getInstance("USD");

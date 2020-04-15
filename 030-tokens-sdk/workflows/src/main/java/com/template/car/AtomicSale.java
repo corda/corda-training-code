@@ -1,4 +1,4 @@
-package com.template.exercise.sale;
+package com.template.car;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.contracts.commands.MoveTokenCommand;
@@ -14,8 +14,8 @@ import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensUtilitiesKt;
 import com.r3.corda.lib.tokens.workflows.internal.flows.distribution.UpdateDistributionListFlow;
 import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
 import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
-import com.template.exercise.car.CarTokenCourseHelpers;
-import com.template.exercise.car.CarTokenType;
+import com.template.car.CarTokenTypeConstants;
+import com.template.car.CarTokenType;
 import kotlin.Pair;
 import net.corda.core.contracts.*;
 import net.corda.core.crypto.SecureHash;
@@ -82,8 +82,8 @@ public interface AtomicSale {
 
             // Prepare the transaction.
             final Party notary = getServiceHub().getIdentityService()
-                    .wellKnownPartyFromX500Name(CarTokenCourseHelpers.NOTARY);
-            if (notary == null) throw new FlowException("Notary not found: " + CarTokenCourseHelpers.NOTARY);
+                    .wellKnownPartyFromX500Name(CarTokenTypeConstants.NOTARY);
+            if (notary == null) throw new FlowException("Notary not found: " + CarTokenTypeConstants.NOTARY);
             final TransactionBuilder txBuilder = new TransactionBuilder(notary);
 
             // Create a proposal to move the car token to Bob.

@@ -1,4 +1,4 @@
-package com.template.exercise.usd;
+package com.template.usd;
 
 import com.google.common.collect.ImmutableList;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
@@ -16,8 +16,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Map;
 
 public interface UsdTokenCourseHelpers {
-    CordaX500Name US_MINT = CordaX500Name.parse("O=US Mint, L=Washington D.C., C=US");
-
     @NotNull
     static MockNetworkParameters prepareMockNetworkParameters() throws Exception {
         return new MockNetworkParameters()

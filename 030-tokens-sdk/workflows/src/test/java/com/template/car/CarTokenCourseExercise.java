@@ -1,4 +1,4 @@
-package com.template.exercise.car;
+package com.template.car;
 
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
@@ -18,7 +18,7 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.List;
 
-import static com.template.exercise.car.CarTokenCourseHelpers.prepareMockNetworkParameters;
+import static com.template.car.CarTokenCourseHelpers.prepareMockNetworkParameters;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -35,9 +35,9 @@ public class CarTokenCourseExercise {
         network = new MockNetwork(prepareMockNetworkParameters());
         notary = network.getDefaultNotaryNode();
         dmv = network.createNode(new MockNodeParameters()
-                .withLegalName(CarTokenCourseHelpers.DMV));
+                .withLegalName(CarTokenTypeConstants.DMV));
         bmwDealer = network.createNode(new MockNodeParameters()
-                .withLegalName(CarTokenCourseHelpers.BMW_DEALER));
+                .withLegalName(CarTokenTypeConstants.BMW_DEALER));
         alice = network.createNode();
         bob = network.createNode();
     }

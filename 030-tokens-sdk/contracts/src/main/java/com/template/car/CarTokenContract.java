@@ -1,4 +1,4 @@
-package com.template.exercise.car;
+package com.template.car;
 
 import com.r3.corda.lib.tokens.contracts.EvolvableTokenContract;
 import net.corda.core.contracts.Contract;

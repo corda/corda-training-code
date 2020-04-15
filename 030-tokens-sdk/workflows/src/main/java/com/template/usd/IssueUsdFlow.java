@@ -1,4 +1,4 @@
-package com.template.exercise.usd;
+package com.template.usd;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
@@ -6,6 +6,7 @@ import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
+import com.template.usd.UsdTokenConstants;
 import net.corda.core.contracts.Amount;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;
@@ -29,7 +30,7 @@ class IssueUsdFlow extends FlowLogic<SignedTransaction> {
     @Suspendable
     public SignedTransaction call() throws FlowException {
         final TokenType usdTokenType = new TokenType("USD", 2);
-        if (!getOurIdentity().getName().equals(UsdTokenCourseHelpers.US_MINT)) {
+        if (!getOurIdentity().getName().equals(UsdTokenConstants.US_MINT)) {
             throw new FlowException("We are not the US Mint");
         }
         final IssuedTokenType usMintUsd = new IssuedTokenType(getOurIdentity(), usdTokenType);

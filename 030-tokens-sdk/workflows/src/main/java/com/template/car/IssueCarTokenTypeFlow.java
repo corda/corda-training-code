@@ -1,4 +1,4 @@
-package com.template.exercise.car;
+package com.template.car;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.CreateEvolvableTokens;
@@ -39,7 +39,7 @@ public class IssueCarTokenTypeFlow extends FlowLogic<SignedTransaction> {
     @Override
     public SignedTransaction call() throws FlowException {
         final Party dmv = getOurIdentity();
-        if (!dmv.getName().equals(CarTokenCourseHelpers.DMV)) {
+        if (!dmv.getName().equals(CarTokenTypeConstants.DMV)) {
             throw new FlowException("We are not the DMV");
         }
         final CarTokenType newCar = new CarTokenType(Collections.singletonList(dmv),
