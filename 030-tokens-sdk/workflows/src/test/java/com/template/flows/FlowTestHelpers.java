@@ -43,7 +43,7 @@ public interface FlowTestHelpers {
     @NotNull
     static Map<String, String> getPropertiesFromConf(@NotNull final String pathname) throws Exception {
         final Properties tokenProperties = new Properties();
-        tokenProperties.load(new FileReader(new File("res/tokens-workflows.conf")));
+        tokenProperties.load(new FileReader(new File(pathname)));
         final Map<String, String> tokensConfig = new HashMap<>();
         for (Map.Entry<Object, Object> next : tokenProperties.entrySet()) {
             tokensConfig.put((String) next.getKey(), removeQuotes((String) next.getValue()));

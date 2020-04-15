@@ -23,7 +23,7 @@ public class UsdTokenCourseExercise {
     private final StartedMockNode alice;
     private final StartedMockNode bob;
 
-    public UsdTokenCourseExercise() throws Exception {
+    public UsdTokenCourseExercise() {
         network = new MockNetwork(prepareMockNetworkParameters());
         usMint = network.createNode(new MockNodeParameters()
                 .withLegalName(UsdTokenConstants.US_MINT));

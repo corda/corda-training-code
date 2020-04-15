@@ -45,7 +45,7 @@ public class AtomicSaleTests {
     private final TokenType usdTokenType;
     private final IssuedTokenType usMintUsd;
 
-    public AtomicSaleTests() throws Exception {
+    public AtomicSaleTests() {
         network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
         notary = network.getDefaultNotaryNode();
         usMint = network.createNode(new MockNodeParameters()

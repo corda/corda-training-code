@@ -1,7 +1,6 @@
 package com.template.car.flow;
 
 import com.google.common.collect.ImmutableList;
-import com.template.car.flow.CarTokenTypeConstants;
 import net.corda.testing.common.internal.ParametersUtilitiesKt;
 import net.corda.testing.node.MockNetworkNotarySpec;
 import net.corda.testing.node.MockNetworkParameters;
@@ -12,7 +11,7 @@ import java.util.Collections;
 
 public interface CarTokenCourseHelpers {
     @NotNull
-    static MockNetworkParameters prepareMockNetworkParameters() throws Exception {
+    static MockNetworkParameters prepareMockNetworkParameters() {
         return new MockNetworkParameters()
                 .withNotarySpecs(Collections.singletonList(new MockNetworkNotarySpec(CarTokenTypeConstants.NOTARY)))
                 .withCordappsForAllNodes(ImmutableList.of(
