@@ -78,7 +78,6 @@ public class UsdTokenCourseExercise {
         assertEquals(1, aliceStates.size());
         final FungibleToken aliceToken = aliceStates.get(0).getState().getData();
         assertEquals(UsdTokenCourseHelpers.createUsdFungible(usMint, alice, 100L), aliceToken);
-
     }
 
     @Test

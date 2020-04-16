@@ -2,22 +2,20 @@ package com.template.contracts;
 
 import com.r3.corda.lib.tokens.contracts.FungibleTokenContract;
 import com.r3.corda.lib.tokens.contracts.commands.MoveTokenCommand;
-import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.template.states.AirMileType;
-import net.corda.core.contracts.Amount;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.testing.contracts.DummyContract;
 import net.corda.testing.core.TestIdentity;
 import net.corda.testing.node.MockServices;
 import org.apache.commons.lang3.NotImplementedException;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
 
+import static com.template.contracts.TokenContractTestHelpers.create;
 import static net.corda.testing.node.NodeTestUtils.transaction;
 import static org.junit.Assert.assertEquals;
 
@@ -28,14 +26,6 @@ public class TokenContractMoveTests {
     private final Party carly = new TestIdentity(new CordaX500Name("Carly", "New York", "US")).getParty();
     private final IssuedTokenType aliceMile = new IssuedTokenType(alice, new AirMileType());
     private final IssuedTokenType carlyMile = new IssuedTokenType(carly, new AirMileType());
-
-    @NotNull
-    private FungibleToken create(
-            @NotNull final IssuedTokenType tokenType,
-            @NotNull final Party holder,
-            final long quantity) {
-        return new FungibleToken(new Amount<>(quantity, tokenType), holder, AirMileType.getContractAttachment());
-    }
 
     @Test
     public void transactionMustIncludeTheAttachment() {
