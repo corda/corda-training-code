@@ -22,6 +22,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Collections;
 
 @SuppressWarnings("unused")
+// Do not use this code.
 public interface NonAtomicSale {
 
     @InitiatingFlow

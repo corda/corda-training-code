@@ -46,7 +46,10 @@ public interface AtomicSale {
         @NotNull
         private final IssuedTokenType issuedCurrency;
 
-        public CarSeller(@NotNull final TokenPointer<CarTokenType> car, @NotNull final Party buyer, @NotNull IssuedTokenType issuedCurrency) {
+        public CarSeller(
+                @NotNull final TokenPointer<CarTokenType> car,
+                @NotNull final Party buyer,
+                @NotNull final IssuedTokenType issuedCurrency) {
             //noinspection ConstantConditions
             if (car == null) throw new NullPointerException("The car cannot be null");
             //noinspection ConstantConditions
@@ -80,10 +83,9 @@ public interface AtomicSale {
             // Send the currency desired.
             buyerSession.send(issuedCurrency);
 
-            // Prepare the transaction.
-            final Party notary = getServiceHub().getIdentityService()
-                    .wellKnownPartyFromX500Name(CarTokenTypeConstants.NOTARY);
-            if (notary == null) throw new FlowException("Notary not found: " + CarTokenTypeConstants.NOTARY);
+            // Prepare the transaction. The only notary the seller and buyer have no control over is that of the
+            // car info. So we have to pick this one.
+            final Party notary = carInfo.getState().getNotary();
             final TransactionBuilder txBuilder = new TransactionBuilder(notary);
 
             // Create a proposal to move the car token to Bob.
@@ -111,11 +113,13 @@ public interface AtomicSale {
                     .map(FungibleToken::getAmount)
                     // Are they of the expected currency?
                     .filter(it -> it.getToken().equals(issuedCurrency))
-                    .map(issuedTokenTypeAmount -> issuedTokenTypeAmount.getQuantity() / 100)
+                    .map(Amount::getQuantity)
                     .reduce(0L, Math::addExact);
             // Make sure we are paid.
-            if (sumPaid < price)
-                throw new FlowException("We were paid only " + sumPaid + " instead of the expected " + price);
+            if (sumPaid < AmountUtilitiesKt.amount(price, issuedCurrency.getTokenType()).getQuantity())
+                throw new FlowException("We were paid only " +
+                        sumPaid / AmountUtilitiesKt.amount(1L, issuedCurrency.getTokenType()).getQuantity() +
+                        " instead of the expected " + price);
 
             // Put those currency states where they belong.
             MoveTokensUtilitiesKt.addMoveTokens(txBuilder, currencyInputs, currencyOutputs);
@@ -204,6 +208,7 @@ public interface AtomicSale {
                 // Make sure this is the transaction we expect: car, price and states we sent.
                 protected void checkTransaction(@NotNull SignedTransaction stx) throws FlowException {
                     // Recall the inputs we prepared in the first part of the flow.
+                    // We can use a Set because all StateRef are truly unique.
                     final Set<StateRef> allKnownInputs = inputsAndOutputs.getFirst().stream()
                             .map(StateAndRef::getRef)
                             .collect(Collectors.toSet());
@@ -219,15 +224,17 @@ public interface AtomicSale {
                     if (allOutputs.size() != inputsAndOutputs.getSecond().size() + 1)
                         throw new FlowException("Wrong count of outputs");
 
-                    // If we keep only those of the proper currency.
-                    final Set<FungibleToken> allCurrencyOutputs = allOutputs.stream()
+                    // If we keep only those of the proper currency. We have to use a List and cannot use a Set
+                    // because 2 "quarters" are equal to each other.
+                    final List<FungibleToken> allCurrencyOutputs = allOutputs.stream()
                             .filter(it -> it instanceof FungibleToken)
                             .map(it -> (FungibleToken) it)
                             .filter(it -> it.getIssuedTokenType().equals(issuedCurrency))
-                            .collect(Collectors.toSet());
-                    // Let's not pass if we don't recognise the states we gave.
-                    if (!new HashSet<>(inputsAndOutputs.getSecond()).equals(allCurrencyOutputs))
-                        throw new FlowException("Inconsistency in FungibleToken outputs compare to expectation");
+                            .collect(Collectors.toList());
+                    // Let's not pass if we don't recognise the states we gave, with the additional constraint that
+                    // they have to be in the same order.
+                    if (!inputsAndOutputs.getSecond().equals(allCurrencyOutputs))
+                        throw new FlowException("Inconsistency in FungibleToken outputs compared to expectation");
 
                     // If we keep only the car tokens.
                     final List<NonFungibleToken> allCarOutputs = allOutputs.stream()
@@ -246,11 +253,10 @@ public interface AtomicSale {
                     // There should only be 2 move commands.
                     final List<Command<?>> commands = stx.getTx().getCommands();
                     if (commands.size() != 2) throw new FlowException("There are not the 2 expected commands");
-                    final Set<MoveTokenCommand> tokenCommands = commands.stream()
-                            .map(Command::component1)
+                    final List<?> tokenCommands = commands.stream()
+                            .map(Command::getValue)
                             .filter(it -> it instanceof MoveTokenCommand)
-                            .map(it -> (MoveTokenCommand) it)
-                            .collect(Collectors.toSet());
+                            .collect(Collectors.toList());
                     if (tokenCommands.size() != 2)
                         throw new FlowException("There are not the 2 expected move commands");
                 }

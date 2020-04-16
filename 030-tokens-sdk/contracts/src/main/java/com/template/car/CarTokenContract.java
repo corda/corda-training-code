@@ -10,7 +10,9 @@ import static net.corda.core.contracts.ContractsDSL.requireThat;
 public class CarTokenContract extends EvolvableTokenContract implements Contract {
 
     @Override
-    public void additionalCreateChecks(@NotNull LedgerTransaction tx) {
+    public void additionalCreateChecks(@NotNull final LedgerTransaction tx) {
+        // Outputs have already been checked as counting exactly 1. If it fails here, it means the output is not
+        // a CarTokenType.
         final CarTokenType outputCarTokenType = tx.outputsOfType(CarTokenType.class).get(0);
         requireThat(require -> {
             // Validation rules on our fields.
@@ -23,7 +25,9 @@ public class CarTokenContract extends EvolvableTokenContract implements Contract
     }
 
     @Override
-    public void additionalUpdateChecks(@NotNull LedgerTransaction tx) {
+    public void additionalUpdateChecks(@NotNull final LedgerTransaction tx) {
+        // Inputs and outputs have already been checked as counting exactly 1 each. If any fails here, it means the
+        // input or output is not a CarTokenType.
         final CarTokenType inputCarTokenType = tx.inputsOfType(CarTokenType.class).get(0);
         final CarTokenType outputCarTokenType = tx.outputsOfType(CarTokenType.class).get(0);
         requireThat(require -> {

@@ -2,11 +2,14 @@ package com.template.car.flow;
 
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
-import com.template.car.*;
+import com.template.car.CarTokenType;
 import net.corda.core.concurrent.CordaFuture;
+import net.corda.core.contracts.LinearPointer;
 import net.corda.core.contracts.StateAndRef;
+import net.corda.core.contracts.UniqueIdentifier;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.Party;
+import net.corda.core.node.services.vault.QueryCriteria;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.MockNetwork;
 import net.corda.testing.node.MockNodeParameters;
@@ -18,6 +21,7 @@ import org.junit.Test;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static com.template.car.flow.CarTokenCourseHelpers.prepareMockNetworkParameters;
 import static org.junit.Assert.assertEquals;
@@ -191,6 +195,65 @@ public class CarTokenCourseExercise {
         assertEquals(9_000L, bmwAccordingToBob.getMileage());
         assertEquals(21_000L, bmwAccordingToBob.getPrice());
     }
+
+    @Test
+    public void canAccessByUUIDAndQuery() throws Exception {
+        final StateAndRef<CarTokenType> bmwRef = createNewBmw("abc126", "BMW", 30_000L,
+                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
+                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
+        final CarTokenType bmw = bmwRef.getState().getData();
+        final NonFungibleToken alicesBmw = issueCarTo(bmw, alice.getInfo().getLegalIdentities().get(0))
+                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
+                .getState().getData();
+        final String bmwId = bmw.getLinearId().getId().toString();
+        final String alicesBmwId = alicesBmw.getLinearId().getId().toString();
+
+        // Alice can retrieve both
+        final QueryCriteria uuidCriteria1 = new QueryCriteria.LinearStateQueryCriteria()
+                .withUuid(Collections.singletonList(UUID.fromString(bmwId)));
+        final List<StateAndRef<CarTokenType>> queryResult1 = alice.getServices().getVaultService()
+                .queryBy(CarTokenType.class, uuidCriteria1)
+                .getStates();
+        assertEquals(1, queryResult1.size());
+        assertEquals(bmw, queryResult1.get(0).getState().getData());
+
+        final QueryCriteria uuidCriteria2 = new QueryCriteria.LinearStateQueryCriteria()
+                .withUuid(Collections.singletonList(UUID.fromString(alicesBmwId)));
+        final List<StateAndRef<NonFungibleToken>> queryResult2 = alice.getServices().getVaultService()
+                .queryBy(NonFungibleToken.class, uuidCriteria2)
+                .getStates();
+        assertEquals(1, queryResult2.size());
+        assertEquals(alicesBmw, queryResult2.get(0).getState().getData());
+    }
+
+    @Test
+    public void canAccessByUUIDAndPointer() throws Exception {
+        final StateAndRef<CarTokenType> bmwRef = createNewBmw("abc126", "BMW", 30_000L,
+                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
+                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
+        final CarTokenType bmw = bmwRef.getState().getData();
+        final NonFungibleToken alicesBmw = issueCarTo(bmw, alice.getInfo().getLegalIdentities().get(0))
+                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
+                .getState().getData();
+        final String bmwId = bmw.getLinearId().getId().toString();
+        final String alicesBmwId = alicesBmw.getLinearId().getId().toString();
+
+        // Alice can retrieve both
+        final StateAndRef<CarTokenType> bmwState = new LinearPointer<>(
+                UniqueIdentifier.Companion.fromString(bmwId),
+                CarTokenType.class,
+                false)
+                .resolve(alice.getServices());
+        assertEquals(bmw, bmwState.getState().getData());
+
+        final StateAndRef<NonFungibleToken> alicesBmwState = new LinearPointer<>(
+                UniqueIdentifier.Companion.fromString(alicesBmwId),
+                NonFungibleToken.class,
+                false)
+                .resolve(alice.getServices());
+        assertEquals(alicesBmw, alicesBmwState.getState().getData());
+    }
+
 
 }
 
