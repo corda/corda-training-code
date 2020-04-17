@@ -45,6 +45,7 @@ dependencies {
     // CorDapp dependencies.
     cordapp "$tokens_release_group:tokens-contracts:$tokens_release_version"
     cordapp "$tokens_release_group:tokens-money:$tokens_release_version"
+    cordapp "$corda_release_group:corda-finance-contracts:$corda_release_version"
 }
 
 if (use_kotlin) tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {

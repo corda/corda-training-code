@@ -8,6 +8,9 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * For demonstration purposes only.
+ */
 @SuppressWarnings("unused")
 public class TrialToken<T> implements FungibleState<Issued<T>>, OwnableState {
 
