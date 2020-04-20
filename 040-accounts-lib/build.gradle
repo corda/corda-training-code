@@ -23,6 +23,8 @@ buildscript {
         tokens_release_group = constants.getProperty("tokensReleaseGroup")
         confidential_id_release_version = constants.getProperty("confidentialIdReleaseVersion")
         confidential_id_release_group = constants.getProperty("confidentialIdReleaseGroup")
+        accounts_release_version = constants.getProperty("accountsLibVersion")
+        accounts_release_group = constants.getProperty("accountsLibReleaseGroup")
     }
 
     repositories {
