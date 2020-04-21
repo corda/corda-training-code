@@ -10,7 +10,7 @@ import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.CreateEvolvableTokens;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.UpdateEvolvableToken;
-import com.template.car.CarTokenType;
+import com.template.car.state.CarTokenType;
 import com.template.usd.UsdTokenConstants;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.Amount;

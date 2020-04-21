@@ -14,7 +14,7 @@ import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensUtilitiesKt;
 import com.r3.corda.lib.tokens.workflows.internal.flows.distribution.UpdateDistributionListFlow;
 import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
 import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
-import com.template.car.CarTokenType;
+import com.template.car.state.CarTokenType;
 import kotlin.Pair;
 import net.corda.core.contracts.*;
 import net.corda.core.crypto.SecureHash;

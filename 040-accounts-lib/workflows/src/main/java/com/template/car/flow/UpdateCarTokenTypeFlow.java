@@ -2,7 +2,7 @@ package com.template.car.flow;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.UpdateEvolvableToken;
-import com.template.car.CarTokenType;
+import com.template.car.state.CarTokenType;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;

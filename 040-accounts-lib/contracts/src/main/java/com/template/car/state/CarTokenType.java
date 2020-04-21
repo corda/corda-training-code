@@ -1,4 +1,4 @@
-package com.template.car;
+package com.template.car.state;
 
 import com.r3.corda.lib.tokens.contracts.states.EvolvableTokenType;
 import net.corda.core.contracts.BelongsToContract;

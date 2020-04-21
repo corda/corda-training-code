@@ -2,7 +2,7 @@ package com.template.car.flow;
 
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
-import com.template.car.CarTokenType;
+import com.template.car.state.CarTokenType;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.LinearPointer;
 import net.corda.core.contracts.StateAndRef;
