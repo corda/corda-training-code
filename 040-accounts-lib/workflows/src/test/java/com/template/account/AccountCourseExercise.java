@@ -2,9 +2,10 @@ package com.template.account;
 
 import com.google.common.collect.ImmutableList;
 import com.r3.corda.lib.accounts.contracts.states.AccountInfo;
-import com.r3.corda.lib.accounts.workflows.UtilitiesKt;
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount;
 import com.r3.corda.lib.accounts.workflows.flows.RequestKeyForAccount;
+import com.r3.corda.lib.accounts.workflows.services.AccountService;
+import com.r3.corda.lib.accounts.workflows.services.KeyManagementBackedAccountService;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.contracts.UniqueIdentifier;
@@ -19,7 +20,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Set;
+import java.security.PublicKey;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.*;
@@ -151,6 +155,22 @@ public class AccountCourseExercise {
         final AnonymousParty carolParty = requestNewKey(alice, carol.getState().getData());
         final Party whoIsCarolByAlice = alice.getServices().getIdentityService().partyFromKey(carolParty.getOwningKey());
         assertEquals(alice.getInfo().getLegalIdentities().get(0), whoIsCarolByAlice);
+    }
+
+    @Test
+    public void accountFromAccountServiceIsCorrect() throws Exception {
+        final StateAndRef<AccountInfo> carol = createAccount(alice, "O=Carol, L=Berlin, C=DE");
+        final AnonymousParty carolParty = requestNewKey(alice, carol.getState().getData());
+        final AccountService aliceAccountService = alice.getServices()
+                .cordaService(KeyManagementBackedAccountService.class);
+        final UUID accountFound = aliceAccountService.accountIdForKey(carolParty.getOwningKey());
+        final StateAndRef<AccountInfo> carolAgain = aliceAccountService.accountInfo(carolParty.getOwningKey());
+        //noinspection ConstantConditions
+        final List<PublicKey> carolKeys = aliceAccountService.accountKeys(accountFound);
+
+        assertEquals(carol.getState().getData().getLinearId().getId(), accountFound);
+        assertEquals(carol, carolAgain);
+        assertEquals(Collections.singletonList(carolParty.getOwningKey()), carolKeys);
     }
 
 }
