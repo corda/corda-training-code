@@ -229,4 +229,72 @@ public class AccountTokenCourseExercise {
         assertEquals(emmasBmw.getHolder(), emmaParty);
     }
 
+    @Test
+    public void accountsCanDoAtomicSale() throws Exception {
+        final CarTokenType bmw = createNewBmw("abc124", "BMW", 25_000L,
+                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
+                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0).getState().getData();
+        final StateAndRef<AccountInfo> dan = createAccount(alice, "dan");
+        final AnonymousParty danParty = requestNewKey(alice, dan.getState().getData());
+        // Inform the dealer and the mint about who is dan.
+        inform(alice, danParty.getOwningKey(), Arrays.asList(bmwDealer, usMint));
+        final NonFungibleToken dansBmw = issueCarTo(bmw, danParty)
+                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
+                .getState().getData();
+        final StateAndRef<AccountInfo> emma = createAccount(bob, "emma");
+        final AnonymousParty emmaParty = requestNewKey(bob, emma.getState().getData());
+        // Inform the seller and the mint about who is dan.
+        inform(bob, emmaParty.getOwningKey(), Arrays.asList(alice, usMint));
+        // Issue dollars to Bob and Emma
+        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(30_000L, usMintUsd);
+        final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
+                bob.getInfo().getLegalIdentities().get(0), null);
+        final FungibleToken usdTokenEmma = new FungibleToken(amountOfUsd,
+                emmaParty, null);
+        final IssueTokens flow = new IssueTokens(
+                Arrays.asList(usdTokenBob, usdTokenEmma),
+                Collections.emptyList());
+        final CordaFuture<SignedTransaction> future = usMint.startFlow(flow);
+        network.runNetwork();
+        future.get();
+        // Proceed with the sale
+        //noinspection unchecked
+        final TokenPointer<CarTokenType> dansBmwPointer = (TokenPointer<CarTokenType>) dansBmw.getTokenType();
+        final AtomicSaleAccounts.CarSeller saleFlow = new AtomicSaleAccounts.CarSeller(
+                dansBmwPointer, emmaParty, usMintUsd);
+        final CordaFuture<SignedTransaction> saleFuture = alice.startFlow(saleFlow);
+        network.runNetwork();
+        final SignedTransaction saleTx = saleFuture.get();
+
+        // Emma got the car
+        final List<NonFungibleToken> emmaCarTokens = saleTx.getCoreTransaction().outputsOfType(NonFungibleToken.class)
+                .stream()
+                .filter(it -> it.getHolder().equals(emmaParty))
+                .collect(Collectors.toList());
+        assertEquals(1, emmaCarTokens.size());
+        final NonFungibleToken emmaCarToken = emmaCarTokens.get(0);
+        //noinspection unchecked
+        final UniqueIdentifier emmaCarType = ((TokenPointer<CarTokenType>) emmaCarToken.getTokenType())
+                .getPointer().getPointer();
+        assertEquals(bmw.getLinearId(), emmaCarType);
+
+        // Dan got the money
+        final long paidToDan = saleTx.getCoreTransaction().outputsOfType(FungibleToken.class)
+                .stream()
+                .filter(it -> it.getHolder().equals(danParty))
+                .filter(it -> it.getIssuedTokenType().equals(usMintUsd))
+                .map(it -> it.getAmount().getQuantity())
+                .reduce(0L, Math::addExact);
+        assertEquals(AmountUtilitiesKt.amount(25_000L, usdTokenType).getQuantity(), paidToDan);
+
+        // Emma got the change
+        final long paidToEmma = saleTx.getCoreTransaction().outputsOfType(FungibleToken.class)
+                .stream()
+                .filter(it -> it.getHolder().equals(emmaParty))
+                .filter(it -> it.getIssuedTokenType().equals(usMintUsd))
+                .map(it -> it.getAmount().getQuantity())
+                .reduce(0L, Math::addExact);
+        assertEquals(AmountUtilitiesKt.amount(5_000L, usdTokenType).getQuantity(), paidToEmma);
+    }
+
 }
