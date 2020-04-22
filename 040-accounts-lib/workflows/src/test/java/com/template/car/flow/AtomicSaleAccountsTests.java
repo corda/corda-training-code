@@ -99,41 +99,31 @@ public class AtomicSaleAccountsTests {
         return future.get();
     }
 
-    private void informPublicKey(
+    private void inform(
             @NotNull final StartedMockNode host,
             @NotNull final PublicKey who,
             @NotNull final List<StartedMockNode> others) throws Exception {
         final AccountService accountService = host.getServices()
                 .cordaService(KeyManagementBackedAccountService.class);
         final StateAndRef<AccountInfo> accountInfo = accountService.accountInfo(who);
-        if (accountInfo == null) throw new NullPointerException("Why");
-        //noinspection ConstantConditions
+        if (accountInfo == null) throw new NullPointerException("You have to start it from a host that knows");
         if (!host.getInfo().getLegalIdentities().get(0).equals(accountInfo.getState().getData().getHost())) {
             throw new IllegalArgumentException("hosts do not match");
         }
-        // TODO how to not use `CordaFuture<Unit>`?
         for (StartedMockNode other : others) {
-            //noinspection rawtypes
-            final CordaFuture future = host.startFlow(new SyncKeyMappingInitiator(
+            final CordaFuture<?> future = host.startFlow(new SyncKeyMappingInitiator(
                     other.getInfo().getLegalIdentities().get(0),
                     Collections.singletonList(new AnonymousParty(who))));
             network.runNetwork();
             future.get();
         }
-    }
-
-    private void informAccount(
-            @NotNull final StartedMockNode host,
-            @NotNull final StateAndRef<AccountInfo> who,
-            @NotNull final List<StartedMockNode> others) throws Exception {
-        // TODO how to not use `CordaFuture<Unit>`?
-        //noinspection rawtypes
-        final CordaFuture future = host.startFlow(new ShareAccountInfo(who, others.stream()
+        final CordaFuture<?> future = host.startFlow(new ShareAccountInfo(accountInfo, others.stream()
                 .map(it -> it.getInfo().getLegalIdentities().get(0))
                 .collect(Collectors.toList())));
         network.runNetwork();
         future.get();
     }
+
 
     @NotNull
     private SignedTransaction createNewBmw(
@@ -168,8 +158,7 @@ public class AtomicSaleAccountsTests {
         final StateAndRef<AccountInfo> dan = createAccount(alice, "dan");
         final AnonymousParty danParty = requestNewKey(alice, dan.getState().getData());
         // Inform the dealer and the mint about who is dan.
-        informPublicKey(alice, danParty.getOwningKey(), Arrays.asList(bmwDealer, usMint));
-        informAccount(alice, dan, Arrays.asList(bmwDealer, usMint));
+        inform(alice, danParty.getOwningKey(), Arrays.asList(bmwDealer, usMint));
         final NonFungibleToken dansBmw = issueCarTo(bmw, danParty)
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
                 .getState().getData();
@@ -178,8 +167,7 @@ public class AtomicSaleAccountsTests {
         // This emma key will not be used when holding the car token.
         final AnonymousParty emmaParty = requestNewKey(bob, emma.getState().getData());
         // Inform the seller's host and the mint about who is emma.
-        informPublicKey(bob, emmaParty.getOwningKey(), Arrays.asList(alice, usMint));
-        informAccount(bob, emma, Arrays.asList(alice, usMint));
+        inform(bob, emmaParty.getOwningKey(), Arrays.asList(alice, usMint));
         // Issue dollars to Bob (to make sure we pay only with Emma's dollars) and Emma.
         final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(30_000L, usMintUsd);
         final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,

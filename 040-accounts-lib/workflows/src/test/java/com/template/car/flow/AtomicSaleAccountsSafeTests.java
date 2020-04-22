@@ -109,8 +109,7 @@ public class AtomicSaleAccountsSafeTests {
         }
         // TODO how to not use `CordaFuture<Unit>`?
         for (StartedMockNode other : others) {
-            //noinspection rawtypes
-            final CordaFuture future = host.startFlow(new SyncKeyMappingInitiator(
+            final CordaFuture<?> future = host.startFlow(new SyncKeyMappingInitiator(
                     other.getInfo().getLegalIdentities().get(0),
                     Collections.singletonList(new AnonymousParty(who))));
             network.runNetwork();
