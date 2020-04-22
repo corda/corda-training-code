@@ -20,6 +20,7 @@ import net.corda.core.contracts.*;
 import net.corda.core.crypto.SecureHash;
 import net.corda.core.flows.*;
 import net.corda.core.identity.AbstractParty;
+import net.corda.core.identity.AnonymousParty;
 import net.corda.core.identity.Party;
 import net.corda.core.node.services.vault.QueryCriteria;
 import net.corda.core.transactions.SignedTransaction;
@@ -139,7 +140,7 @@ public interface AtomicSaleAccounts {
                     seller.getOwningKey());
             final SignedTransaction fullySignedTx = subFlow(new CollectSignaturesFlow(partSignedTx,
                     Collections.singletonList(buyerSession),
-                    // We tell we already signed with our own or our account's key/
+                    // We tell we already signed with our own or our account's key.
                     Collections.singleton(seller.getOwningKey())));
 
             // Distribute updates of the evolvable car token.
