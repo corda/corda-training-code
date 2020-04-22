@@ -3,6 +3,7 @@ package com.template.car.flow;
 import com.r3.corda.lib.accounts.contracts.states.AccountInfo;
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount;
 import com.r3.corda.lib.accounts.workflows.flows.RequestKeyForAccount;
+import com.r3.corda.lib.accounts.workflows.flows.ShareAccountInfo;
 import com.r3.corda.lib.accounts.workflows.services.AccountService;
 import com.r3.corda.lib.accounts.workflows.services.KeyManagementBackedAccountService;
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingInitiator;
@@ -36,11 +37,13 @@ import java.security.PublicKey;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
-public class AtomicSaleAccountsSafeTests {
+public class AtomicSaleAccountsTests {
     private final MockNetwork network;
     private final StartedMockNode notary;
     private final StartedMockNode usMint;
@@ -51,7 +54,7 @@ public class AtomicSaleAccountsSafeTests {
     private final TokenType usdTokenType;
     private final IssuedTokenType usMintUsd;
 
-    public AtomicSaleAccountsSafeTests() {
+    public AtomicSaleAccountsTests() {
         network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
         notary = network.getDefaultNotaryNode();
         usMint = network.createNode(new MockNodeParameters()
@@ -96,13 +99,14 @@ public class AtomicSaleAccountsSafeTests {
         return future.get();
     }
 
-    private void inform(
+    private void informPublicKey(
             @NotNull final StartedMockNode host,
             @NotNull final PublicKey who,
             @NotNull final List<StartedMockNode> others) throws Exception {
         final AccountService accountService = host.getServices()
                 .cordaService(KeyManagementBackedAccountService.class);
         final StateAndRef<AccountInfo> accountInfo = accountService.accountInfo(who);
+        if (accountInfo == null) throw new NullPointerException("Why");
         //noinspection ConstantConditions
         if (!host.getInfo().getLegalIdentities().get(0).equals(accountInfo.getState().getData().getHost())) {
             throw new IllegalArgumentException("hosts do not match");
@@ -116,6 +120,19 @@ public class AtomicSaleAccountsSafeTests {
             network.runNetwork();
             future.get();
         }
+    }
+
+    private void informAccount(
+            @NotNull final StartedMockNode host,
+            @NotNull final StateAndRef<AccountInfo> who,
+            @NotNull final List<StartedMockNode> others) throws Exception {
+        // TODO how to not use `CordaFuture<Unit>`?
+        //noinspection rawtypes
+        final CordaFuture future = host.startFlow(new ShareAccountInfo(who, others.stream()
+                .map(it -> it.getInfo().getLegalIdentities().get(0))
+                .collect(Collectors.toList())));
+        network.runNetwork();
+        future.get();
     }
 
     @NotNull
@@ -135,6 +152,7 @@ public class AtomicSaleAccountsSafeTests {
     private SignedTransaction issueCarTo(
             @NotNull final CarTokenType car,
             @NotNull final AbstractParty holder) throws Exception {
+        // We keep our account-safe IssueCarToHolderFlow instead of creating an account-aware one.
         final IssueCarToHolderFlow flow = new IssueCarToHolderFlow(
                 car, bmwDealer.getInfo().getLegalIdentities().get(0), holder);
         final CordaFuture<SignedTransaction> future = bmwDealer.startFlow(flow);
@@ -143,75 +161,25 @@ public class AtomicSaleAccountsSafeTests {
     }
 
     @Test
-    public void partiesCanDoAtomicSaleAccountsSafe() throws Exception {
-        final CarTokenType bmw = createNewBmw("abc124", "BMW", 25_000L,
-                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
-                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0).getState().getData();
-        final NonFungibleToken alicesBmw = issueCarTo(bmw, alice.getInfo().getLegalIdentities().get(0))
-                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
-                .getState().getData();
-        // Issue dollars to Bob.
-        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(30_000L, usMintUsd);
-        final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
-                bob.getInfo().getLegalIdentities().get(0), null);
-        final IssueTokens flow = new IssueTokens(
-                Collections.singletonList(usdTokenBob),
-                Collections.emptyList());
-        final CordaFuture<SignedTransaction> future = usMint.startFlow(flow);
-        network.runNetwork();
-        future.get();
-
-        //noinspection unchecked
-        final TokenPointer<CarTokenType> bmwPointer = (TokenPointer<CarTokenType>) alicesBmw.getTokenType();
-        final AtomicSaleAccountsSafe.CarSeller saleFlow = new AtomicSaleAccountsSafe.CarSeller(bmwPointer,
-                bob.getInfo().getLegalIdentities().get(0),
-                usMintUsd);
-        final CordaFuture<SignedTransaction> saleFuture = alice.startFlow(saleFlow);
-        network.runNetwork();
-        final SignedTransaction saleTx = saleFuture.get();
-
-        // Alice got paid.
-        final List<FungibleToken> aliceUsdTokens = saleTx.getCoreTransaction().outputsOfType(FungibleToken.class)
-                .stream()
-                .filter(it -> it.getHolder().equals(alice.getInfo().getLegalIdentities().get(0)))
-                .filter(it -> it.getIssuedTokenType().equals(usMintUsd))
-                .collect(Collectors.toList());
-        final Amount<IssuedTokenType> aliceReceived = Amount.sumOrThrow(aliceUsdTokens.stream()
-                .map(FungibleToken::getAmount)
-                .collect(Collectors.toList()));
-        assertEquals(
-                AmountUtilitiesKt.amount(25_000L, usdTokenType).getQuantity(),
-                aliceReceived.getQuantity());
-
-        // Bob got the car.
-        final List<NonFungibleToken> bobCarTokens = saleTx.getCoreTransaction().outputsOfType(NonFungibleToken.class)
-                .stream()
-                .filter(it -> it.getHolder().equals(bob.getInfo().getLegalIdentities().get(0)))
-                .collect(Collectors.toList());
-        assertEquals(1, bobCarTokens.size());
-        final NonFungibleToken bobCarToken = bobCarTokens.get(0);
-        //noinspection unchecked
-        final UniqueIdentifier bobCarType = ((TokenPointer<CarTokenType>) bobCarToken.getTokenType())
-                .getPointer().getPointer();
-        assertEquals(bmwPointer.getPointer().getPointer(), bobCarType);
-    }
-
-    @Test
-    public void accountsCanDoAtomicSaleAccountsSafe() throws Exception {
+    public void accountsCanDoAtomicSaleAccounts() throws Exception {
         final CarTokenType bmw = createNewBmw("abc124", "BMW", 25_000L,
                 Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0).getState().getData();
         final StateAndRef<AccountInfo> dan = createAccount(alice, "dan");
         final AnonymousParty danParty = requestNewKey(alice, dan.getState().getData());
         // Inform the dealer and the mint about who is dan.
-        inform(alice, danParty.getOwningKey(), Arrays.asList(bmwDealer, usMint));
+        informPublicKey(alice, danParty.getOwningKey(), Arrays.asList(bmwDealer, usMint));
+        informAccount(alice, dan, Arrays.asList(bmwDealer, usMint));
         final NonFungibleToken dansBmw = issueCarTo(bmw, danParty)
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
                 .getState().getData();
         final StateAndRef<AccountInfo> emma = createAccount(bob, "emma");
+        final UUID emmaId = emma.getState().getData().getIdentifier().getId();
+        // This emma key will not be used when holding the car token.
         final AnonymousParty emmaParty = requestNewKey(bob, emma.getState().getData());
         // Inform the seller's host and the mint about who is emma.
-        inform(bob, emmaParty.getOwningKey(), Arrays.asList(alice, usMint));
+        informPublicKey(bob, emmaParty.getOwningKey(), Arrays.asList(alice, usMint));
+        informAccount(bob, emma, Arrays.asList(alice, usMint));
         // Issue dollars to Bob (to make sure we pay only with Emma's dollars) and Emma.
         final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(30_000L, usMintUsd);
         final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
@@ -227,25 +195,28 @@ public class AtomicSaleAccountsSafeTests {
         // Proceed with the sale
         //noinspection unchecked
         final TokenPointer<CarTokenType> dansBmwPointer = (TokenPointer<CarTokenType>) dansBmw.getTokenType();
-        final AtomicSaleAccountsSafe.CarSeller saleFlow = new AtomicSaleAccountsSafe.CarSeller(
-                dansBmwPointer, emmaParty, usMintUsd);
+        final AtomicSaleAccounts.CarSeller saleFlow = new AtomicSaleAccounts.CarSeller(
+                dansBmwPointer, emmaId, usMintUsd);
         final CordaFuture<SignedTransaction> saleFuture = alice.startFlow(saleFlow);
         network.runNetwork();
         final SignedTransaction saleTx = saleFuture.get();
 
+        final AccountService bobAccountService = bob.getServices()
+                .cordaService(KeyManagementBackedAccountService.class);
+
         // Emma got the car
-        final List<NonFungibleToken> emmaCarTokens = saleTx.getCoreTransaction().outputsOfType(NonFungibleToken.class)
-                .stream()
-                .filter(it -> it.getHolder().equals(emmaParty))
-                .collect(Collectors.toList());
+        final List<NonFungibleToken> emmaCarTokens = saleTx.getCoreTransaction().outputsOfType(NonFungibleToken.class);
         assertEquals(1, emmaCarTokens.size());
         final NonFungibleToken emmaCarToken = emmaCarTokens.get(0);
+        assertEquals(emmaId, bobAccountService.accountIdForKey(emmaCarToken.getHolder().getOwningKey()));
+        // Emma got the car on a new public key.
+        assertNotEquals(emmaParty.getOwningKey(), emmaCarToken.getHolder().getOwningKey());
         //noinspection unchecked
         final UniqueIdentifier emmaCarType = ((TokenPointer<CarTokenType>) emmaCarToken.getTokenType())
                 .getPointer().getPointer();
         assertEquals(bmw.getLinearId(), emmaCarType);
 
-        // Dan got the money
+        // Dan got the money.
         final long paidToDan = saleTx.getCoreTransaction().outputsOfType(FungibleToken.class)
                 .stream()
                 .filter(it -> it.getHolder().equals(danParty))
@@ -254,10 +225,10 @@ public class AtomicSaleAccountsSafeTests {
                 .reduce(0L, Math::addExact);
         assertEquals(AmountUtilitiesKt.amount(25_000L, usdTokenType).getQuantity(), paidToDan);
 
-        // Emma got the change
+        // Emma got the change on her new public key.
         final long paidToEmma = saleTx.getCoreTransaction().outputsOfType(FungibleToken.class)
                 .stream()
-                .filter(it -> it.getHolder().equals(emmaParty))
+                .filter(it -> it.getHolder().equals(emmaCarToken.getHolder()))
                 .filter(it -> it.getIssuedTokenType().equals(usMintUsd))
                 .map(it -> it.getAmount().getQuantity())
                 .reduce(0L, Math::addExact);
