@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 import static com.r3.corda.lib.tokens.selection.database.config.DatabaseSelectionConfigKt.*;
 import static com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt.heldTokenCriteria;
 
-public interface AtomicSaleAccounts {
+public interface AtomicSaleAccountsSafe {
 
     @InitiatingFlow
     class CarSeller extends FlowLogic<SignedTransaction> {

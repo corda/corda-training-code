@@ -173,7 +173,7 @@ public class AtomicSaleTests {
                 21_000L, 9_000L);
         //noinspection unchecked
         final TokenPointer<CarTokenType> bmwPointer = (TokenPointer<CarTokenType>) bmw.getTokenType();
-        final AtomicSaleAccounts.CarSeller saleFlow = new AtomicSaleAccounts.CarSeller(bmwPointer,
+        final AtomicSaleAccountsSafe.CarSeller saleFlow = new AtomicSaleAccountsSafe.CarSeller(bmwPointer,
                 bob.getInfo().getLegalIdentities().get(0),
                 usMintUsd);
         final CordaFuture<SignedTransaction> saleFuture = alice.startFlow(saleFlow);

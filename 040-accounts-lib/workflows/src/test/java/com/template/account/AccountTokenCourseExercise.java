@@ -260,7 +260,7 @@ public class AccountTokenCourseExercise {
         // Proceed with the sale
         //noinspection unchecked
         final TokenPointer<CarTokenType> dansBmwPointer = (TokenPointer<CarTokenType>) dansBmw.getTokenType();
-        final AtomicSaleAccounts.CarSeller saleFlow = new AtomicSaleAccounts.CarSeller(
+        final AtomicSaleAccountsSafe.CarSeller saleFlow = new AtomicSaleAccountsSafe.CarSeller(
                 dansBmwPointer, emmaParty, usMintUsd);
         final CordaFuture<SignedTransaction> saleFuture = alice.startFlow(saleFlow);
         network.runNetwork();
