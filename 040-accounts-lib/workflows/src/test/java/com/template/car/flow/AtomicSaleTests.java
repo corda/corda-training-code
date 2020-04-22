@@ -167,43 +167,4 @@ public class AtomicSaleTests {
         assertEquals(bmwPointer.getPointer().getPointer(), bobCarType);
     }
 
-    @Test
-    public void saleAccountIsAsExpected() throws Exception {
-        final NonFungibleToken bmw = issueUpdatedCarToAlice("abc123", "BMW", 30_000L,
-                21_000L, 9_000L);
-        //noinspection unchecked
-        final TokenPointer<CarTokenType> bmwPointer = (TokenPointer<CarTokenType>) bmw.getTokenType();
-        final AtomicSaleAccountsSafe.CarSeller saleFlow = new AtomicSaleAccountsSafe.CarSeller(bmwPointer,
-                bob.getInfo().getLegalIdentities().get(0),
-                usMintUsd);
-        final CordaFuture<SignedTransaction> saleFuture = alice.startFlow(saleFlow);
-        network.runNetwork();
-        final SignedTransaction saleTx = saleFuture.get();
-
-        // Alice got paid
-        final List<FungibleToken> aliceUsdTokens = saleTx.getCoreTransaction().outputsOfType(FungibleToken.class)
-                .stream()
-                .filter(it -> it.getHolder().equals(alice.getInfo().getLegalIdentities().get(0)))
-                .filter(it -> it.getIssuedTokenType().equals(usMintUsd))
-                .collect(Collectors.toList());
-        final Amount<IssuedTokenType> aliceReceived = Amount.sumOrThrow(aliceUsdTokens.stream()
-                .map(FungibleToken::getAmount)
-                .collect(Collectors.toList()));
-        assertEquals(
-                AmountUtilitiesKt.amount(21_000L, usdTokenType).getQuantity(),
-                aliceReceived.getQuantity());
-
-        // Bob got the car
-        final List<NonFungibleToken> bobCarTokens = saleTx.getCoreTransaction().outputsOfType(NonFungibleToken.class)
-                .stream()
-                .filter(it -> it.getHolder().equals(bob.getInfo().getLegalIdentities().get(0)))
-                .collect(Collectors.toList());
-        assertEquals(1, bobCarTokens.size());
-        final NonFungibleToken bobCarToken = bobCarTokens.get(0);
-        //noinspection unchecked
-        final UniqueIdentifier bobCarType = ((TokenPointer<CarTokenType>) bobCarToken.getTokenType())
-                .getPointer().getPointer();
-        assertEquals(bmwPointer.getPointer().getPointer(), bobCarType);
-    }
-
 }
