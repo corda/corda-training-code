@@ -20,7 +20,6 @@ import net.corda.core.contracts.*;
 import net.corda.core.crypto.SecureHash;
 import net.corda.core.flows.*;
 import net.corda.core.identity.AbstractParty;
-import net.corda.core.identity.AnonymousParty;
 import net.corda.core.identity.Party;
 import net.corda.core.node.services.vault.QueryCriteria;
 import net.corda.core.transactions.SignedTransaction;
@@ -64,17 +63,57 @@ public interface AtomicSaleAccountsSafe {
         }
 
         @Suspendable
+        @NotNull
+        @Override
+        public SignedTransaction call() throws FlowException {
+            // We need to have been informed about any anonymous identity ahead of time.
+            final Party buyerHost = getServiceHub().getIdentityService().requireWellKnownPartyFromAnonymous(buyer);
+            final FlowSession buyerSession = initiateFlow(buyerHost);
+            // The host needs to know which of its accounts is buying.
+            buyerSession.send(buyer);
+            return subFlow(new CarSellerFlow(car, buyer, buyerSession, issuedCurrency));
+        }
+    }
+
+    /**
+     * Its responder is {@link CarBuyerFlow}.
+     */
+    class CarSellerFlow extends FlowLogic<SignedTransaction> {
+
+        @NotNull
+        private final TokenPointer<CarTokenType> car;
+        @NotNull
+        private final AbstractParty buyer;
+        @NotNull
+        private final FlowSession buyerSession;
+        @NotNull
+        private final IssuedTokenType issuedCurrency;
+
+        public CarSellerFlow(
+                @NotNull final TokenPointer<CarTokenType> car,
+                @NotNull final AbstractParty buyer,
+                @NotNull final FlowSession buyerSession,
+                @NotNull final IssuedTokenType issuedCurrency) {
+            //noinspection ConstantConditions
+            if (car == null) throw new NullPointerException("The car cannot be null");
+            //noinspection ConstantConditions
+            if (buyer == null) throw new NullPointerException("The buyer cannot be null");
+            //noinspection ConstantConditions
+            if (buyerSession == null) throw new NullPointerException("The buyerSession cannot be null");
+            //noinspection ConstantConditions
+            if (issuedCurrency == null) throw new NullPointerException("The issuedCurrency cannot be null");
+            this.car = car;
+            this.buyer = buyer;
+            this.buyerSession = buyerSession;
+            this.issuedCurrency = issuedCurrency;
+        }
+
+        @Suspendable
         @Override
         @NotNull
         public SignedTransaction call() throws FlowException {
             // Fetch the latest known state.
             final StateAndRef<CarTokenType> carInfo = car.getPointer().resolve(getServiceHub());
-            // We need to have been informed about any anonymous identity ahead of time.
-            final Party buyerHost = getServiceHub().getIdentityService().requireWellKnownPartyFromAnonymous(buyer);
-            // Send the car information to the buyer. A bit ahead of time so that it can fetch states while we do too.
-            final FlowSession buyerSession = initiateFlow(buyerHost);
-            // The host needs to know which of its accounts is buying.
-            buyerSession.send(buyer);
             subFlow(new SendStateAndRefFlow(buyerSession, Collections.singletonList(carInfo)));
 
             final long price = carInfo.getState().getData().getPrice();
@@ -84,6 +123,7 @@ public interface AtomicSaleAccountsSafe {
             if (ownedCarTokens.size() != 1) throw new FlowException("NonFungibleToken not found");
             final AbstractParty seller = ownedCarTokens.get(0).getState().getData().getHolder();
 
+            // Send the car information to the buyer. A bit ahead of time so that it can fetch states while we do too.
             // Send the proof that we own the car.
             subFlow(new SendStateAndRefFlow(buyerSession, ownedCarTokens));
 
@@ -157,17 +197,38 @@ public interface AtomicSaleAccountsSafe {
         @NotNull
         private final FlowSession sellerSession;
 
-        @SuppressWarnings("unused")
         public CarBuyer(@NotNull final FlowSession sellerSession) {
             this.sellerSession = sellerSession;
         }
 
         @Suspendable
         @Override
-        @NotNull
         public SignedTransaction call() throws FlowException {
             // Receive the buyer information
             final AbstractParty buyer = sellerSession.receive(AbstractParty.class).unwrap(it -> it);
+            return subFlow(new CarBuyerFlow(sellerSession, buyer));
+        }
+    }
+
+    /**
+     * Responder for {@link CarSellerFlow}.
+     */
+    class CarBuyerFlow extends FlowLogic<SignedTransaction> {
+        @NotNull
+        private final FlowSession sellerSession;
+        @NotNull
+        private final AbstractParty buyer;
+
+        @SuppressWarnings("unused")
+        public CarBuyerFlow(@NotNull final FlowSession sellerSession, @NotNull final AbstractParty buyer) {
+            this.sellerSession = sellerSession;
+            this.buyer = buyer;
+        }
+
+        @Suspendable
+        @Override
+        @NotNull
+        public SignedTransaction call() throws FlowException {
             // Receive the car information. We will resolve the car type right after, from the NonFungibleToken, but
             // we have to receive for now.
             final List<StateAndRef<CarTokenType>> carInfos = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
