@@ -99,31 +99,39 @@ public class AtomicSaleAccountsTests {
         return future.get();
     }
 
-    private void inform(
+    private void informKeys(
             @NotNull final StartedMockNode host,
-            @NotNull final PublicKey who,
+            @NotNull final List<PublicKey> who,
             @NotNull final List<StartedMockNode> others) throws Exception {
-        final AccountService accountService = host.getServices()
-                .cordaService(KeyManagementBackedAccountService.class);
-        final StateAndRef<AccountInfo> accountInfo = accountService.accountInfo(who);
-        if (accountInfo == null) throw new NullPointerException("You have to start it from a host that knows");
-        if (!host.getInfo().getLegalIdentities().get(0).equals(accountInfo.getState().getData().getHost())) {
-            throw new IllegalArgumentException("hosts do not match");
-        }
         for (StartedMockNode other : others) {
             final CordaFuture<?> future = host.startFlow(new SyncKeyMappingInitiator(
                     other.getInfo().getLegalIdentities().get(0),
-                    Collections.singletonList(new AnonymousParty(who))));
+                    who.stream()
+                            .distinct()
+                            .map(AnonymousParty::new)
+                            .collect(Collectors.toList())));
             network.runNetwork();
             future.get();
         }
-        final CordaFuture<?> future = host.startFlow(new ShareAccountInfo(accountInfo, others.stream()
-                .map(it -> it.getInfo().getLegalIdentities().get(0))
-                .collect(Collectors.toList())));
-        network.runNetwork();
-        future.get();
     }
 
+    private void informAccounts(
+            @NotNull final StartedMockNode host,
+            @NotNull final List<StateAndRef<AccountInfo>> who,
+            @NotNull final List<StartedMockNode> others) throws Exception {
+        for (final StateAndRef<AccountInfo> accountInfo : who) {
+            if (accountInfo == null)
+                throw new NullPointerException("You have to start it from a host that knows");
+            if (!host.getInfo().getLegalIdentities().get(0).equals(accountInfo.getState().getData().getHost())) {
+                throw new IllegalArgumentException("hosts do not match");
+            }
+            final CordaFuture<?> future = host.startFlow(new ShareAccountInfo(accountInfo, others.stream()
+                    .map(it -> it.getInfo().getLegalIdentities().get(0))
+                    .collect(Collectors.toList())));
+            network.runNetwork();
+            future.get();
+        }
+    }
 
     @NotNull
     private SignedTransaction createNewBmw(
@@ -158,24 +166,30 @@ public class AtomicSaleAccountsTests {
         final StateAndRef<AccountInfo> dan = createAccount(alice, "dan");
         final AnonymousParty danParty = requestNewKey(alice, dan.getState().getData());
         // Inform the dealer and the mint about who is dan.
-        inform(alice, danParty.getOwningKey(), Arrays.asList(bmwDealer, usMint));
+        informKeys(alice, Collections.singletonList(danParty.getOwningKey()), Arrays.asList(bmwDealer, usMint));
         final NonFungibleToken dansBmw = issueCarTo(bmw, danParty)
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
                 .getState().getData();
         final StateAndRef<AccountInfo> emma = createAccount(bob, "emma");
         final UUID emmaId = emma.getState().getData().getIdentifier().getId();
-        // This emma key will not be used when holding the car token.
-        final AnonymousParty emmaParty = requestNewKey(bob, emma.getState().getData());
-        // Inform the seller's host and the mint about who is emma.
-        inform(bob, emmaParty.getOwningKey(), Arrays.asList(alice, usMint));
-        // Issue dollars to Bob (to make sure we pay only with Emma's dollars) and Emma.
-        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(30_000L, usMintUsd);
+        // These emma keys will not be used when holding the car token.
+        final AnonymousParty emmaParty1 = requestNewKey(bob, emma.getState().getData());
+        final AnonymousParty emmaParty2 = requestNewKey(bob, emma.getState().getData());
+        // Inform the mint about who is emma1 and emma2.
+        informKeys(bob,
+                Arrays.asList(emmaParty1.getOwningKey(), emmaParty2.getOwningKey()),
+                Collections.singletonList(usMint));
+        // Inform the seller about emma
+        informAccounts(bob, Collections.singletonList(emma), Collections.singletonList(alice));
+        // Issue dollars to Bob (to make sure we pay only with Emma's dollars) and both identities of Emma.
+        // Like this the flow will collect from both identities of Emma.
+        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(15_000L, usMintUsd);
         final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
                 bob.getInfo().getLegalIdentities().get(0), null);
-        final FungibleToken usdTokenEmma = new FungibleToken(amountOfUsd,
-                emmaParty, null);
+        final FungibleToken usdTokenEmma1 = new FungibleToken(amountOfUsd, emmaParty1, null);
+        final FungibleToken usdTokenEmma2 = new FungibleToken(amountOfUsd, emmaParty2, null);
         final IssueTokens flow = new IssueTokens(
-                Arrays.asList(usdTokenBob, usdTokenEmma),
+                Arrays.asList(usdTokenBob, usdTokenEmma1, usdTokenEmma2),
                 Collections.emptyList());
         final CordaFuture<SignedTransaction> future = usMint.startFlow(flow);
         network.runNetwork();
@@ -198,7 +212,7 @@ public class AtomicSaleAccountsTests {
         final NonFungibleToken emmaCarToken = emmaCarTokens.get(0);
         assertEquals(emmaId, bobAccountService.accountIdForKey(emmaCarToken.getHolder().getOwningKey()));
         // Emma got the car on a new public key.
-        assertNotEquals(emmaParty.getOwningKey(), emmaCarToken.getHolder().getOwningKey());
+        assertNotEquals(emmaParty1.getOwningKey(), emmaCarToken.getHolder().getOwningKey());
         //noinspection unchecked
         final UniqueIdentifier emmaCarType = ((TokenPointer<CarTokenType>) emmaCarToken.getTokenType())
                 .getPointer().getPointer();

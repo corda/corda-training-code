@@ -1,6 +1,8 @@
 package com.template.car.flow;
 
 import co.paralleluniverse.fibers.Suspendable;
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlow;
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlowHandler;
 import com.r3.corda.lib.tokens.contracts.commands.MoveTokenCommand;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
@@ -153,6 +155,15 @@ public interface AtomicSaleAccountsSafe {
                         holderCurrencyInputCount);
             // Other than that, we do not care much about the inputs as we expect that any error will be caught by the
             // contract.
+            // Collect the missing public keys
+            final List<AbstractParty> missingKeys = currencyInputs.stream()
+                    .map(it -> it.getState().getData().getHolder())
+                    .filter(it -> getServiceHub().getIdentityService().wellKnownPartyFromAnonymous(it) == null)
+                    .collect(Collectors.toList());
+            // And send them.
+            buyerSession.send(missingKeys);
+            // Receive the resolutions.
+            subFlow(new SyncKeyMappingFlowHandler(buyerSession));
 
             // Receive the currency states that will go in output.
             // noinspection unchecked
@@ -274,6 +285,12 @@ public interface AtomicSaleAccountsSafe {
 
             // Send the currency states that will go in input, along with their history.
             subFlow(new SendStateAndRefFlow(sellerSession, inputsAndOutputs.getFirst()));
+
+            // Receive the public keys missing from the buyer.
+            //noinspection unchecked
+            final List<AbstractParty> missingKeys = (List<AbstractParty>) sellerSession.receive(List.class).unwrap(it -> it);
+            // Send the resolution to these missing keys.
+            subFlow(new SyncKeyMappingFlow(sellerSession, missingKeys));
 
             // Send the currency states that will go in output.
             sellerSession.send(inputsAndOutputs.getSecond());
