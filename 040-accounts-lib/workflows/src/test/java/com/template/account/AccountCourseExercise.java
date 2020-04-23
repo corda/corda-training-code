@@ -74,10 +74,16 @@ public class AccountCourseExercise {
 
     @Test
     public void canCreateAccount() throws Exception {
-        final StateAndRef<AccountInfo> carol = createAccount(alice, "carol");
+        final AccountInfo carol = createAccount(alice, "carol").getState().getData();
 
-        assertEquals(alice.getInfo().getLegalIdentities().get(0), carol.getState().getData().getHost());
-        assertEquals("carol", carol.getState().getData().getName());
+        assertEquals(alice.getInfo().getLegalIdentities().get(0), carol.getHost());
+        assertEquals("carol", carol.getName());
+        assertEquals(alice.getInfo().getLegalIdentities().get(0), carol.getHost());
+        final AccountService aliceAccountService = alice.getServices()
+                .cordaService(KeyManagementBackedAccountService.class);
+        final List<PublicKey> carolKeys = aliceAccountService
+                .accountKeys(carol.getLinearId().getId());
+        assertEquals(0, carolKeys.size());
     }
 
     @Test
