@@ -39,6 +39,9 @@ import static com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt.heldT
 
 public interface AtomicSaleAccountsSafe {
 
+    /**
+     * Its responder flow is {@link CarBuyer}.
+     */
     @InitiatingFlow
     class CarSeller extends FlowLogic<SignedTransaction> {
 
@@ -68,24 +71,34 @@ public interface AtomicSaleAccountsSafe {
         @NotNull
         @Override
         public SignedTransaction call() throws FlowException {
-            // We need to have been informed about any anonymous identity ahead of time.
+            // We need to have been informed about this possibly anonymous identity ahead of time.
             final Party buyerHost = getServiceHub().getIdentityService().requireWellKnownPartyFromAnonymous(buyer);
             final FlowSession buyerSession = initiateFlow(buyerHost);
-            // The host needs to know which of its accounts is buying.
-            buyerSession.send(buyer);
-            return subFlow(new CarSellerFlow(car, buyer, buyerSession, issuedCurrency));
+            return subFlow(new CarSellerFlow(car, buyerSession, issuedCurrency) {
+                @NotNull
+                @Override
+                protected FlowLogic<AbstractParty> getSyncBuyerPartyFlow() {
+                    return new FlowLogic<AbstractParty>() {
+                        @Suspendable
+                        @NotNull
+                        @Override
+                        public AbstractParty call() {
+                            buyerSession.send(buyer);
+                            return buyer;
+                        }
+                    };
+                }
+            });
         }
     }
 
     /**
      * Its responder is {@link CarBuyerFlow}.
      */
-    class CarSellerFlow extends FlowLogic<SignedTransaction> {
+    abstract class CarSellerFlow extends FlowLogic<SignedTransaction> {
 
         @NotNull
         private final TokenPointer<CarTokenType> car;
-        @NotNull
-        private final AbstractParty buyer;
         @NotNull
         private final FlowSession buyerSession;
         @NotNull
@@ -93,27 +106,31 @@ public interface AtomicSaleAccountsSafe {
 
         public CarSellerFlow(
                 @NotNull final TokenPointer<CarTokenType> car,
-                @NotNull final AbstractParty buyer,
                 @NotNull final FlowSession buyerSession,
                 @NotNull final IssuedTokenType issuedCurrency) {
             //noinspection ConstantConditions
             if (car == null) throw new NullPointerException("The car cannot be null");
             //noinspection ConstantConditions
-            if (buyer == null) throw new NullPointerException("The buyer cannot be null");
-            //noinspection ConstantConditions
             if (buyerSession == null) throw new NullPointerException("The buyerSession cannot be null");
             //noinspection ConstantConditions
             if (issuedCurrency == null) throw new NullPointerException("The issuedCurrency cannot be null");
             this.car = car;
-            this.buyer = buyer;
             this.buyerSession = buyerSession;
             this.issuedCurrency = issuedCurrency;
         }
+
+        /**
+         * @return This function returns a flow instance whose handler is returned by
+         * {@link CarBuyerFlow#getSyncBuyerPartyHandlerFlow()}.
+         */
+        @NotNull
+        abstract protected FlowLogic<AbstractParty> getSyncBuyerPartyFlow();
 
         @Suspendable
         @Override
         @NotNull
         public SignedTransaction call() throws FlowException {
+            final AbstractParty buyer = subFlow(getSyncBuyerPartyFlow());
             // Fetch the latest known state.
             final StateAndRef<CarTokenType> carInfo = car.getPointer().resolve(getServiceHub());
             subFlow(new SendStateAndRefFlow(buyerSession, Collections.singletonList(carInfo)));
@@ -215,31 +232,59 @@ public interface AtomicSaleAccountsSafe {
         @Suspendable
         @Override
         public SignedTransaction call() throws FlowException {
-            // Receive the buyer information
-            final AbstractParty buyer = sellerSession.receive(AbstractParty.class).unwrap(it -> it);
-            return subFlow(new CarBuyerFlow(sellerSession, buyer));
+            return subFlow(new CarBuyerFlow(sellerSession) {
+                @NotNull
+                @Override
+                protected FlowLogic<AbstractParty> getSyncBuyerPartyHandlerFlow() {
+                    return new FlowLogic<AbstractParty>() {
+                        @Suspendable
+                        @NotNull
+                        @Override
+                        public AbstractParty call() throws FlowException {
+                            return sellerSession.receive(AbstractParty.class).unwrap(it -> it);
+                        }
+                    };
+                }
+
+                @NotNull
+                @Override
+                protected QueryCriteria getHeldByBuyer(
+                        @NotNull IssuedTokenType issuedCurrency,
+                        @NotNull final AbstractParty buyer) {
+                    return QueryUtilitiesKt.heldTokenAmountCriteria(issuedCurrency.getTokenType(), buyer);
+                }
+            });
         }
     }
 
     /**
      * Responder for {@link CarSellerFlow}.
      */
-    class CarBuyerFlow extends FlowLogic<SignedTransaction> {
+    abstract class CarBuyerFlow extends FlowLogic<SignedTransaction> {
         @NotNull
         private final FlowSession sellerSession;
-        @NotNull
-        private final AbstractParty buyer;
 
         @SuppressWarnings("unused")
-        public CarBuyerFlow(@NotNull final FlowSession sellerSession, @NotNull final AbstractParty buyer) {
+        public CarBuyerFlow(@NotNull final FlowSession sellerSession) {
             this.sellerSession = sellerSession;
-            this.buyer = buyer;
         }
+
+        /**
+         * @return a flow instance that is the counterpart to {@link CarSellerFlow#getSyncBuyerPartyFlow()}.
+         */
+        @NotNull
+        abstract protected FlowLogic<AbstractParty> getSyncBuyerPartyHandlerFlow() ;
+
+        @NotNull
+        abstract protected QueryCriteria getHeldByBuyer(
+                @NotNull final IssuedTokenType issuedCurrency,
+                @NotNull final AbstractParty buyer) throws FlowException;
 
         @Suspendable
         @Override
         @NotNull
         public SignedTransaction call() throws FlowException {
+            final AbstractParty buyer = subFlow(getSyncBuyerPartyHandlerFlow());
             // Receive the car information. We will resolve the car type right after, from the NonFungibleToken, but
             // we have to receive for now.
             final List<StateAndRef<CarTokenType>> carInfos = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
@@ -265,8 +310,7 @@ public interface AtomicSaleAccountsSafe {
             // TODO have an internal check that this is indeed the currency that the buyer decided to use in the sale.
 
             // Assemble the currency states.
-            final QueryCriteria heldByBuyer = QueryUtilitiesKt.heldTokenAmountCriteria(
-                    issuedCurrency.getTokenType(), buyer);
+            final QueryCriteria heldByBuyer = getHeldByBuyer(issuedCurrency, buyer);
             final QueryCriteria properlyIssued = QueryUtilitiesKt.tokenAmountWithIssuerCriteria(
                     issuedCurrency.getTokenType(), issuedCurrency.getIssuer());
             // Have the utility do the "dollars to cents" conversion for us.
