@@ -121,7 +121,8 @@ public interface AtomicSaleAccountsSafe {
 
         /**
          * @return This function returns a flow instance whose handler is returned by
-         * {@link CarBuyerFlow#getSyncBuyerPartyHandlerFlow()}.
+         * {@link CarBuyerFlow#getSyncBuyerPartyHandlerFlow()}. Both this flow and its handler have to return the same
+         * {@link AbstractParty} for the flow to succeed.
          */
         @NotNull
         abstract protected FlowLogic<AbstractParty> getSyncBuyerPartyFlow();
@@ -137,14 +138,14 @@ public interface AtomicSaleAccountsSafe {
 
             final long price = carInfo.getState().getData().getPrice();
             final QueryCriteria tokenCriteria = heldTokenCriteria(car);
-            final List<StateAndRef<NonFungibleToken>> ownedCarTokens = getServiceHub().getVaultService()
+            final List<StateAndRef<NonFungibleToken>> heldCarTokens = getServiceHub().getVaultService()
                     .queryBy(NonFungibleToken.class, tokenCriteria).getStates();
-            if (ownedCarTokens.size() != 1) throw new FlowException("NonFungibleToken not found");
-            final AbstractParty seller = ownedCarTokens.get(0).getState().getData().getHolder();
+            if (heldCarTokens.size() != 1) throw new FlowException("NonFungibleToken not found");
+            final AbstractParty seller = heldCarTokens.get(0).getState().getData().getHolder();
 
             // Send the car information to the buyer. A bit ahead of time so that it can fetch states while we do too.
             // Send the proof that we own the car.
-            subFlow(new SendStateAndRefFlow(buyerSession, ownedCarTokens));
+            subFlow(new SendStateAndRefFlow(buyerSession, heldCarTokens));
 
             // Send the currency desired.
             buyerSession.send(issuedCurrency);
@@ -270,10 +271,11 @@ public interface AtomicSaleAccountsSafe {
         }
 
         /**
-         * @return a flow instance that is the counterpart to {@link CarSellerFlow#getSyncBuyerPartyFlow()}.
+         * @return a flow instance that is the handler of {@link CarSellerFlow#getSyncBuyerPartyFlow()}. Both this flow
+         * and its counterpart have to return the same {@link AbstractParty} for the flow to succeed.
          */
         @NotNull
-        abstract protected FlowLogic<AbstractParty> getSyncBuyerPartyHandlerFlow() ;
+        abstract protected FlowLogic<AbstractParty> getSyncBuyerPartyHandlerFlow();
 
         @NotNull
         abstract protected QueryCriteria getHeldByBuyer(
@@ -292,12 +294,12 @@ public interface AtomicSaleAccountsSafe {
             final StateAndRef<CarTokenType> carInfo = carInfos.get(0);
             final long price = carInfo.getState().getData().getPrice();
             // Receive the owned car information.
-            final List<StateAndRef<NonFungibleToken>> heldCarInfos = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
-            if (heldCarInfos.size() != 1) throw new FlowException("We expected a single held car");
-            final StateAndRef<NonFungibleToken> heldCarInfo = heldCarInfos.get(0);
+            final List<StateAndRef<NonFungibleToken>> heldCarTokens = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
+            if (heldCarTokens.size() != 1) throw new FlowException("We expected a single held car");
+            final StateAndRef<NonFungibleToken> heldCarToken = heldCarTokens.get(0);
             // Is this the same car?
             //noinspection unchecked
-            if (!((TokenPointer<CarTokenType>) heldCarInfo.getState().getData().getTokenType())
+            if (!((TokenPointer<CarTokenType>) heldCarToken.getState().getData().getTokenType())
                     .getPointer().getPointer()
                     .equals(carInfo.getState().getData().getLinearId()))
                 throw new FlowException("The owned car does not correspond to the earlier car info.");
@@ -321,7 +323,7 @@ public interface AtomicSaleAccountsSafe {
                     getServiceHub(), MAX_RETRIES_DEFAULT, RETRY_SLEEP_DEFAULT, RETRY_CAP_DEFAULT, PAGE_SIZE_DEFAULT);
             final Pair<List<StateAndRef<FungibleToken>>, List<FungibleToken>> inputsAndOutputs = tokenSelection.generateMove(
                     // Eventually held by the seller.
-                    Collections.singletonList(new Pair<>(heldCarInfo.getState().getData().getHolder(), priceInCurrency)),
+                    Collections.singletonList(new Pair<>(heldCarToken.getState().getData().getHolder(), priceInCurrency)),
                     // We see here that we should not rely on the default value, because the buyer keeps the change.
                     buyer,
                     new TokenQueryBy(issuedCurrency.getIssuer(), it -> true, heldByBuyer.and(properlyIssued)),
@@ -352,7 +354,7 @@ public interface AtomicSaleAccountsSafe {
                             .map(StateAndRef::getRef)
                             .collect(Collectors.toSet());
                     // There should be no extra inputs, other than the car.
-                    allKnownInputs.add(heldCarInfo.getRef());
+                    allKnownInputs.add(heldCarToken.getRef());
                     final Set<StateRef> allInputs = new HashSet<>(stx.getInputs());
                     if (!allInputs.equals(allKnownInputs))
                         throw new FlowException("Inconsistency in input refs compared to expectation");
@@ -384,7 +386,7 @@ public interface AtomicSaleAccountsSafe {
                     if (allCarOutputs.size() != 1) throw new FlowException("Wrong count of car outputs");
                     // And it has to be the car we expect.
                     final NonFungibleToken outputHeldCar = allCarOutputs.get(0);
-                    if (!outputHeldCar.getLinearId().equals(heldCarInfo.getState().getData().getLinearId()))
+                    if (!outputHeldCar.getLinearId().equals(heldCarToken.getState().getData().getLinearId()))
                         throw new FlowException("This is not the car we expected");
                     if (!outputHeldCar.getHolder().equals(buyer))
                         throw new FlowException("The car is not held by the buyer in output");

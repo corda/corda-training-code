@@ -73,12 +73,12 @@ public interface AtomicSale {
 
             final long price = carInfo.getState().getData().getPrice();
             final QueryCriteria tokenCriteria = heldTokenCriteria(car);
-            final List<StateAndRef<NonFungibleToken>> ownedCarTokens = getServiceHub().getVaultService()
+            final List<StateAndRef<NonFungibleToken>> heldCarTokens = getServiceHub().getVaultService()
                     .queryBy(NonFungibleToken.class, tokenCriteria).getStates();
-            if (ownedCarTokens.size() != 1) throw new FlowException("NonFungibleToken not found");
+            if (heldCarTokens.size() != 1) throw new FlowException("NonFungibleToken not found");
 
             // Send the proof that we own the car.
-            subFlow(new SendStateAndRefFlow(buyerSession, ownedCarTokens));
+            subFlow(new SendStateAndRefFlow(buyerSession, heldCarTokens));
 
             // Send the currency desired.
             buyerSession.send(issuedCurrency);
@@ -160,12 +160,12 @@ public interface AtomicSale {
             final StateAndRef<CarTokenType> carInfo = carInfos.get(0);
             final long price = carInfo.getState().getData().getPrice();
             // Receive the owned car information.
-            final List<StateAndRef<NonFungibleToken>> heldCarInfos = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
-            if (heldCarInfos.size() != 1) throw new FlowException("We expected a single held car");
-            final StateAndRef<NonFungibleToken> heldCarInfo = heldCarInfos.get(0);
+            final List<StateAndRef<NonFungibleToken>> heldCarTokens = subFlow(new ReceiveStateAndRefFlow<>(sellerSession));
+            if (heldCarTokens.size() != 1) throw new FlowException("We expected a single held car");
+            final StateAndRef<NonFungibleToken> heldCarToken = heldCarTokens.get(0);
             // Is this the same car?
             //noinspection unchecked
-            if (!((TokenPointer<CarTokenType>) heldCarInfo.getState().getData().getTokenType())
+            if (!((TokenPointer<CarTokenType>) heldCarToken.getState().getData().getTokenType())
                     .getPointer().getPointer()
                     .equals(carInfo.getState().getData().getLinearId()))
                 throw new FlowException("The owned car does not correspond to the earlier car info.");
@@ -213,7 +213,7 @@ public interface AtomicSale {
                             .map(StateAndRef::getRef)
                             .collect(Collectors.toSet());
                     // There should be no extra inputs, other than the car.
-                    allKnownInputs.add(heldCarInfo.getRef());
+                    allKnownInputs.add(heldCarToken.getRef());
                     final Set<StateRef> allInputs = new HashSet<>(stx.getInputs());
                     if (!allInputs.equals(allKnownInputs))
                         throw new FlowException("Inconsistency in input refs compared to expectation");
@@ -245,7 +245,7 @@ public interface AtomicSale {
                     if (allCarOutputs.size() != 1) throw new FlowException("Wrong count of car outputs");
                     // And it has to be the car we expect.
                     final NonFungibleToken outputHeldCar = allCarOutputs.get(0);
-                    if (!outputHeldCar.getLinearId().equals(heldCarInfo.getState().getData().getLinearId()))
+                    if (!outputHeldCar.getLinearId().equals(heldCarToken.getState().getData().getLinearId()))
                         throw new FlowException("This is not the car we expected");
                     if (!outputHeldCar.getHolder().equals(getOurIdentity()))
                         throw new FlowException("The car is not held by us in output");

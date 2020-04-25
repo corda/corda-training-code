@@ -165,8 +165,8 @@ public class AtomicSaleAccountsTests {
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0).getState().getData();
         final StateAndRef<AccountInfo> dan = createAccount(alice, "dan");
         final AnonymousParty danParty = requestNewKey(alice, dan.getState().getData());
-        // Inform the dealer and the mint about who is dan.
-        informKeys(alice, Collections.singletonList(danParty.getOwningKey()), Arrays.asList(bmwDealer, usMint));
+        // Inform the dealer about who is dan.
+        informKeys(alice, Collections.singletonList(danParty.getOwningKey()), Collections.singletonList(bmwDealer));
         final NonFungibleToken dansBmw = issueCarTo(bmw, danParty)
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
                 .getState().getData();
@@ -211,7 +211,7 @@ public class AtomicSaleAccountsTests {
         assertEquals(1, emmaCarTokens.size());
         final NonFungibleToken emmaCarToken = emmaCarTokens.get(0);
         assertEquals(emmaId, bobAccountService.accountIdForKey(emmaCarToken.getHolder().getOwningKey()));
-        // Emma got the car on a new public key.
+        // Emma got the car on her new public key.
         assertNotEquals(emmaParty1.getOwningKey(), emmaCarToken.getHolder().getOwningKey());
         //noinspection unchecked
         final UniqueIdentifier emmaCarType = ((TokenPointer<CarTokenType>) emmaCarToken.getTokenType())

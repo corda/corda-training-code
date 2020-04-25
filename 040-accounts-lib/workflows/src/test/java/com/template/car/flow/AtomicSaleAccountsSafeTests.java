@@ -202,8 +202,8 @@ public class AtomicSaleAccountsSafeTests {
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0).getState().getData();
         final StateAndRef<AccountInfo> dan = createAccount(alice, "dan");
         final AnonymousParty danParty = requestNewKey(alice, dan.getState().getData());
-        // Inform the dealer and the mint about who is dan.
-        inform(alice, danParty.getOwningKey(), Arrays.asList(bmwDealer, usMint));
+        // Inform the dealer about who is dan.
+        inform(alice, danParty.getOwningKey(), Collections.singletonList(bmwDealer));
         final NonFungibleToken dansBmw = issueCarTo(bmw, danParty)
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
                 .getState().getData();
