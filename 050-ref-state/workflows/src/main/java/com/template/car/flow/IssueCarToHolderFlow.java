@@ -9,6 +9,7 @@ import com.template.car.state.CarTokenType;
 import net.corda.core.contracts.UniqueIdentifier;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;
+import net.corda.core.flows.StartableByRPC;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.Party;
 import net.corda.core.transactions.SignedTransaction;
@@ -16,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 
+@StartableByRPC
 public class IssueCarToHolderFlow extends FlowLogic<SignedTransaction> {
 
     @NotNull

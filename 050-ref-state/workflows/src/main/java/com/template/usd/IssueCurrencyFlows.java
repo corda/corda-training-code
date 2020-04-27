@@ -9,8 +9,8 @@ import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;
+import net.corda.core.flows.StartableByRPC;
 import net.corda.core.identity.AbstractParty;
-import net.corda.core.identity.Party;
 import net.corda.core.transactions.SignedTransaction;
 import org.jetbrains.annotations.NotNull;
 
@@ -24,6 +24,7 @@ public interface IssueCurrencyFlows {
      * flow start com.template.usd.IssueCurrencyFlows$IssueCurrencyToHolderSimpleFlow currencyCode: USD, quantity: 1000, holder: PartyB
      */
     @SuppressWarnings("unused")
+    @StartableByRPC
     class IssueCurrencyToHolderSimpleFlow extends FlowLogic<SignedTransaction> {
 
         @NotNull

@@ -29,6 +29,7 @@ import static com.r3.corda.lib.tokens.workflows.utilities.NotaryUtilitiesKt.getP
 
 public interface SalesProposalOfferFlows {
 
+    @StartableByRPC
     @InitiatingFlow
     class OfferSimpleFlow extends FlowLogic<SignedTransaction> {
 

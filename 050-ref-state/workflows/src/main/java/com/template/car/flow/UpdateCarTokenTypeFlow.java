@@ -6,12 +6,14 @@ import com.template.car.state.CarTokenType;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;
+import net.corda.core.flows.StartableByRPC;
 import net.corda.core.identity.Party;
 import net.corda.core.transactions.SignedTransaction;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
+@StartableByRPC
 public class UpdateCarTokenTypeFlow extends FlowLogic<SignedTransaction> {
 
     @NotNull

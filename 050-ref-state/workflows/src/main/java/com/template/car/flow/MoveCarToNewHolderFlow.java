@@ -7,6 +7,7 @@ import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
 import com.template.car.state.CarTokenType;
 import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;
+import net.corda.core.flows.StartableByRPC;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.Party;
 import net.corda.core.transactions.SignedTransaction;
@@ -14,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
+@StartableByRPC
 public class MoveCarToNewHolderFlow extends FlowLogic<SignedTransaction> {
 
     @NotNull

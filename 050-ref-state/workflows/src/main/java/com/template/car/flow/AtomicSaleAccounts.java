@@ -27,6 +27,7 @@ public interface AtomicSaleAccounts {
     /**
      * Its responder flow is {@link CarBuyer}.
      */
+    @StartableByRPC
     @InitiatingFlow
     class CarSeller extends FlowLogic<SignedTransaction> {
 
