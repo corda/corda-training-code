@@ -16,7 +16,6 @@ import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
 import com.template.car.state.CarTokenType;
-import com.template.usd.UsdTokenConstants;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.StateAndRef;
@@ -148,10 +147,10 @@ public class AtomicSaleAccountsTests {
 
     @NotNull
     private SignedTransaction issueCarTo(
-            @NotNull final CarTokenType car,
+            @NotNull final TokenPointer<CarTokenType> car,
             @NotNull final AbstractParty holder) throws Exception {
         // We keep our account-safe IssueCarToHolderFlow instead of creating an account-aware one.
-        final IssueCarToHolderFlow flow = new IssueCarToHolderFlow(
+        final IssueCarToHolderFlows.IssueCarToHolderFlow flow = new IssueCarToHolderFlows.IssueCarToHolderFlow(
                 car, bmwDealer.getInfo().getLegalIdentities().get(0), holder);
         final CordaFuture<SignedTransaction> future = bmwDealer.startFlow(flow);
         network.runNetwork();
@@ -167,7 +166,7 @@ public class AtomicSaleAccountsTests {
         final AnonymousParty danParty = requestNewKey(alice, dan.getState().getData());
         // Inform the dealer about who is dan.
         informKeys(alice, Collections.singletonList(danParty.getOwningKey()), Collections.singletonList(bmwDealer));
-        final NonFungibleToken dansBmw = issueCarTo(bmw, danParty)
+        final NonFungibleToken dansBmw = issueCarTo(bmw.toPointer(CarTokenType.class), danParty)
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
                 .getState().getData();
         final StateAndRef<AccountInfo> emma = createAccount(bob, "emma");

@@ -21,7 +21,7 @@ public interface IssueCurrencyFlows {
 
     /**
      * Can be started on the command line with:
-     * flow start com.template.usd.IssueCurrencyFlows$IssueCurrencyToHolderSimpleFlow currencyCode: USD, quantity: 1000, holder: PartyB
+     * flow start IssueCurrencyFlows$IssueCurrencyToHolderSimpleFlow currencyCode: USD, quantity: 1000, holder: PartyB
      */
     @SuppressWarnings("unused")
     @StartableByRPC
@@ -33,9 +33,10 @@ public interface IssueCurrencyFlows {
         @NotNull
         private final AbstractParty holder;
 
-        public IssueCurrencyToHolderSimpleFlow(@NotNull final String currencyCode,
-                                               final long quantity,
-                                               @NotNull final AbstractParty holder) {
+        public IssueCurrencyToHolderSimpleFlow(
+                @NotNull final String currencyCode,
+                final long quantity,
+                @NotNull final AbstractParty holder) {
             //noinspection ConstantConditions
             if (currencyCode == null) throw new NullPointerException("The currencyCode cannot be null");
             //noinspection ConstantConditions
