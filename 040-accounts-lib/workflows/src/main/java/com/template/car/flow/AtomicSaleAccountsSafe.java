@@ -176,6 +176,7 @@ public interface AtomicSaleAccountsSafe {
             // Collect the missing public keys
             final List<AbstractParty> missingKeys = currencyInputs.stream()
                     .map(it -> it.getState().getData().getHolder())
+                    .distinct()
                     .filter(it -> getServiceHub().getIdentityService().wellKnownPartyFromAnonymous(it) == null)
                     .collect(Collectors.toList());
             // And send them.
@@ -332,9 +333,16 @@ public interface AtomicSaleAccountsSafe {
             // Send the currency states that will go in input, along with their history.
             subFlow(new SendStateAndRefFlow(sellerSession, inputsAndOutputs.getFirst()));
 
-            // Receive the public keys missing from the buyer.
+            // Prepare the potentially missing keys.
+            final Set<AbstractParty> potentiallyMissingKeys = inputsAndOutputs.getFirst().stream()
+                    .map(it -> it.getState().getData().getHolder())
+                    .collect(Collectors.toSet());
+            // Receive from the seller the public keys actually missing.
             //noinspection unchecked
             final List<AbstractParty> missingKeys = (List<AbstractParty>) sellerSession.receive(List.class).unwrap(it -> it);
+            // Make sure we are not hoodwinked into disclosing unrelated keys.
+            if (!potentiallyMissingKeys.containsAll(missingKeys))
+                throw new FlowException("A missing key is not in the potentially missing keys");
             // Send the resolution to these missing keys.
             subFlow(new SyncKeyMappingFlow(sellerSession, missingKeys));
 
