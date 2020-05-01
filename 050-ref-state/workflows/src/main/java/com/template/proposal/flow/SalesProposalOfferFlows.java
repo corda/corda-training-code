@@ -23,6 +23,7 @@ import net.corda.core.utilities.ProgressTracker.Step;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
+import java.util.List;
 
 import static com.r3.corda.lib.tokens.workflows.utilities.NotaryUtilitiesKt.firstNotary;
 import static com.r3.corda.lib.tokens.workflows.utilities.NotaryUtilitiesKt.getPreferredNotary;
@@ -30,7 +31,7 @@ import static com.r3.corda.lib.tokens.workflows.utilities.NotaryUtilitiesKt.getP
 public interface SalesProposalOfferFlows {
 
     /**
-     * Flow
+     * Its handler is {@link OfferSimpleHandlerFlow}.
      */
     @StartableByRPC
     @InitiatingFlow
@@ -101,19 +102,22 @@ public interface SalesProposalOfferFlows {
             progressTracker.setCurrentStep(FETCHING_ASSET);
             final QueryCriteria assetCriteria = new QueryCriteria.LinearStateQueryCriteria()
                     .withUuid(Collections.singletonList(assetId.getId()));
-            final StateAndRef<NonFungibleToken> asset = getServiceHub().getVaultService()
+            final List<StateAndRef<NonFungibleToken>> assets = getServiceHub().getVaultService()
                     .queryBy(NonFungibleToken.class, assetCriteria)
-                    .getStates()
-                    .get(0);
+                    .getStates();
+            if (assets.size() != 1) throw new FlowException("Wrong number of assets found");
+            final StateAndRef<NonFungibleToken> asset = assets.get(0);
 
             progressTracker.setCurrentStep(PASSING_ON);
             return subFlow(new OfferFlow(asset, buyer,
                     AmountUtilitiesKt.amount(price, new IssuedTokenType(issuer, currency)),
-                    PASSING_ON.childProgressTracker()
-            ));
+                    PASSING_ON.childProgressTracker()));
         }
     }
 
+    /**
+     * Its handler is {@link OfferHandlerFlow}.
+     */
     class OfferFlow extends FlowLogic<SignedTransaction> {
 
         private final static Step GENERATING_TRANSACTION = new Step("Generating transaction based on parameters.");
@@ -174,9 +178,8 @@ public interface SalesProposalOfferFlows {
         public SignedTransaction call() throws FlowException {
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
             final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), asset, buyer, price);
-            final TransactionBuilder builder = new TransactionBuilder(getPreferredNotary(
-                    this.getServiceHub(), firstNotary()))
-                    .addOutputState(proposal, SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID)
+            final TransactionBuilder builder = new TransactionBuilder(asset.getState().getNotary())
+                    .addOutputState(proposal)
                     .addReferenceState(new ReferencedStateAndRef<>(asset))
                     .addCommand(new SalesProposalContract.Commands.Offer(),
                             Collections.singletonList(proposal.getSeller().getOwningKey()));
@@ -205,11 +208,14 @@ public interface SalesProposalOfferFlows {
     @InitiatedBy(OfferSimpleFlow.class)
     class OfferSimpleHandlerFlow extends OfferHandlerFlow {
 
-        public OfferSimpleHandlerFlow(@NotNull FlowSession sellerSession) {
+        public OfferSimpleHandlerFlow(@NotNull final FlowSession sellerSession) {
             super(sellerSession);
         }
     }
 
+    /**
+     * It is the handler of {@link OfferFlow}.
+     */
     class OfferHandlerFlow extends FlowLogic<SignedTransaction> {
 
         @NotNull

@@ -16,10 +16,7 @@ import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
 import com.template.proposal.state.SalesProposal;
 import com.template.proposal.state.SalesProposalContract;
 import kotlin.Pair;
-import net.corda.core.contracts.Amount;
-import net.corda.core.contracts.ContractState;
-import net.corda.core.contracts.StateAndRef;
-import net.corda.core.contracts.StateRef;
+import net.corda.core.contracts.*;
 import net.corda.core.crypto.SecureHash;
 import net.corda.core.flows.*;
 import net.corda.core.identity.AbstractParty;
@@ -42,6 +39,73 @@ import static com.r3.corda.lib.tokens.selection.database.config.DatabaseSelectio
 
 public interface SalesProposalAcceptFlows {
 
+    /**
+     * Its responder flow is {@link AcceptSimpleHandlerFlow}.
+     */
+    @StartableByRPC
+    @InitiatingFlow
+    class AcceptSimpleFlow extends FlowLogic<SignedTransaction> {
+
+        private final static ProgressTracker.Step FETCHING_PROPOSAL = new ProgressTracker.Step("Fetching proposal from the vault.");
+        private final static ProgressTracker.Step PASSING_ON = new ProgressTracker.Step("Passing on to AcceptFlow.") {
+            @NotNull
+            @Override
+            public ProgressTracker childProgressTracker() {
+                return AcceptFlow.tracker();
+            }
+        };
+
+        @NotNull
+        public static ProgressTracker tracker() {
+            return new ProgressTracker(FETCHING_PROPOSAL, PASSING_ON);
+        }
+
+        @NotNull
+        private final UniqueIdentifier proposalId;
+        @NotNull
+        private final ProgressTracker progressTracker;
+
+        public AcceptSimpleFlow(
+                @NotNull final UniqueIdentifier proposalId,
+                @NotNull final ProgressTracker progressTracker) {
+            //noinspection ConstantConditions
+            if (proposalId == null) throw new NullPointerException("The proposalId cannot be null");
+            //noinspection ConstantConditions
+            if (progressTracker == null) throw new NullPointerException("The progressTracker cannot be null");
+            this.proposalId = proposalId;
+            this.progressTracker = progressTracker;
+        }
+
+        @Suspendable
+        @NotNull
+        @Override
+        public SignedTransaction call() throws FlowException {
+            progressTracker.setCurrentStep(FETCHING_PROPOSAL);
+            final QueryCriteria proposalCriteria = new QueryCriteria.LinearStateQueryCriteria()
+                    .withUuid(Collections.singletonList(proposalId.getId()));
+            final List<StateAndRef<SalesProposal>> proposals = getServiceHub().getVaultService()
+                    .queryBy(SalesProposal.class, proposalCriteria)
+                    .getStates();
+            if (proposals.size() != 1) throw new FlowException("Wrong number of proposals found");
+            final StateAndRef<SalesProposal> proposal = proposals.get(0);
+
+            // We need to have been informed about this possibly anonymous identity ahead of time.
+            progressTracker.setCurrentStep(PASSING_ON);
+            return subFlow(new AcceptFlow(proposal, PASSING_ON.childProgressTracker()) {
+                @NotNull
+                @Override
+                protected QueryCriteria getHeldByBuyer(
+                        @NotNull final IssuedTokenType issuedCurrency,
+                        @NotNull final AbstractParty buyer) throws FlowException {
+                    return QueryUtilitiesKt.heldTokenAmountCriteria(issuedCurrency.getTokenType(), buyer);
+                }
+            });
+        }
+    }
+
+    /**
+     * Its handler is {@link AcceptHandlerFlow}.
+     */
     abstract class AcceptFlow extends FlowLogic<SignedTransaction> {
 
         private final static Step GENERATING_TRANSACTION = new Step("Generating transaction based on parameters.");
@@ -183,6 +247,17 @@ public interface SalesProposalAcceptFlows {
         }
     }
 
+    @InitiatedBy(AcceptSimpleFlow.class)
+    class AcceptSimpleHandlerFlow extends AcceptHandlerFlow {
+
+        public AcceptSimpleHandlerFlow(@NotNull FlowSession buyerSession) {
+            super(buyerSession);
+        }
+    }
+
+    /**
+     * It is the handler of {@link AcceptFlow}.
+     */
     class AcceptHandlerFlow extends FlowLogic<SignedTransaction> {
 
         @NotNull
@@ -207,6 +282,13 @@ public interface SalesProposalAcceptFlows {
             final SecureHash txId = subFlow(new SignTransactionFlow(buyerSession) {
                 @Override
                 protected void checkTransaction(@NotNull SignedTransaction stx) throws FlowException {
+                    // Let's make sure there is an Accept command.
+                    final List<Command<?>> commands = stx.getTx().getCommands().stream()
+                            .filter(it -> it.getValue() instanceof SalesProposalContract.Commands.Accept)
+                            .collect(Collectors.toList());
+                    if (commands.size() != 1)
+                        throw new FlowException("There is no accept command");
+
                     final List<SalesProposal> proposals = new ArrayList<>(1);
                     final List<NonFungibleToken> assetsIn = new ArrayList<>(1);
                     final List<FungibleToken> moniesIn = new ArrayList<>(stx.getInputs().size());
@@ -227,8 +309,7 @@ public interface SalesProposalAcceptFlows {
                     final NonFungibleToken assetIn = assetsIn.get(0);
                     // If the asset does not match the proposal, it will be caught in the contract.
 
-                    // Let's make sure the buyer is not trying to pass off some of our own monies as payment...
-                    // After all, we are going to sign this transaction.
+                    // Let's make sure we are signing with a single key.
                     final List<PublicKey> allInputKeys = moniesIn.stream()
                             .map(it -> it.getHolder().getOwningKey())
                             .collect(Collectors.toList());
@@ -238,8 +319,16 @@ public interface SalesProposalAcceptFlows {
                             false)
                             .collect(Collectors.toList());
                     if (myKeys.size() != 1) throw new FlowException("There are not the expected keys of mine");
-                    if (!myKeys.get(0).equals(proposal.getBuyer().getOwningKey()))
-                        throw new FlowException("The key of mine is not the buyer");
+                    if (!myKeys.get(0).equals(proposal.getSeller().getOwningKey()))
+                        throw new FlowException("The key of mine is not the seller");
+
+                    // Let's make sure the buyer is not trying to pass off some of our own monies as payment...
+                    // After all, we are going to sign this transaction.
+                    final List<FungibleToken> myInMonies = moniesIn.stream()
+                            .filter(it -> it.getHolder().equals(proposal.getSeller()))
+                            .collect(Collectors.toList());
+                    if (!myInMonies.isEmpty())
+                        throw new FlowException("There is a FungibleToken of mine in input");
 
                     // That I am paid is covered by the sales proposal contract.
                 }
