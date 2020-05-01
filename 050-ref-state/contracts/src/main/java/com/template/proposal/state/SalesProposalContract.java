@@ -39,13 +39,13 @@ public class SalesProposalContract implements Contract {
             if (command.getValue() instanceof Commands.Offer) {
                 req.using("There should be no sales proposal inputs on offer",
                         inSalesProposals.isEmpty());
+                req.using("There should be a single sales proposal output on offer",
+                        outSalesProposals.size() == 1);
                 req.using("There should be a single reference input token on offer",
                         inRefs.size() == 1);
                 final StateAndRef<AbstractToken> refToken = inRefs.get(0);
-                req.using("There should be a single sales proposal output on offer",
-                        outSalesProposals.size() == 1);
                 final SalesProposal proposal = outSalesProposals.get(0).getState().getData();
-                req.using("The reference input token should match the sales proposal output asset",
+                req.using("The reference token should match the sales proposal output asset",
                         proposal.getAsset().equals(refToken));
                 req.using("The sales proposal offer price should not be zero",
                         0 < proposal.getPrice().getQuantity());
@@ -54,9 +54,9 @@ public class SalesProposalContract implements Contract {
             } else if (command.getValue() instanceof Commands.Accept) {
                 req.using("There should be a single input sales proposal on accept",
                         inSalesProposals.size() == 1);
-                final SalesProposal proposal = inSalesProposals.get(0).getState().getData();
                 req.using("There should be no sales proposal outputs on accept",
                         outSalesProposals.isEmpty());
+                final SalesProposal proposal = inSalesProposals.get(0).getState().getData();
                 req.using("The asset should be an input on accept",
                         inNFTokens.contains(proposal.getAsset()));
                 final List<NonFungibleToken> boughtAsset = outNFTokens.stream()
@@ -73,12 +73,14 @@ public class SalesProposalContract implements Contract {
                         .reduce(0L, Math::addExact);
                 req.using("The seller should be paid the agreed amount in the agreed issued token on accept",
                         proposal.getPrice().getQuantity() <= sellerPayment);
+                req.using("The buyer should be the only signer on accept",
+                        Collections.singletonList(proposal.getBuyer().getOwningKey()).equals(command.getSigners()));
             } else if (command.getValue() instanceof Commands.Reject) {
                 req.using("There should be a single input sales proposal on reject",
                         inSalesProposals.size() == 1);
-                final SalesProposal proposal = inSalesProposals.get(0).getState().getData();
                 req.using("There should be no sales proposal outputs on reject",
                         outSalesProposals.isEmpty());
+                final SalesProposal proposal = inSalesProposals.get(0).getState().getData();
                 req.using("The seller or the buyer or both should be signers",
                         command.getSigners().contains(proposal.getSeller().getOwningKey()) ||
                                 command.getSigners().contains(proposal.getBuyer().getOwningKey()));

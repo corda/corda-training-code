@@ -168,7 +168,7 @@ public class SalesProposalContractOfferTests {
                     txCopy.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
                             new SalesProposal(new UniqueIdentifier(), aliceIssueTx2.outRef(0), carly, amount3));
                     return txCopy.failsWith(
-                            "The reference input token should match the sales proposal output asset");
+                            "The reference token should match the sales proposal output asset");
                 });
 
                 tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
@@ -203,7 +203,7 @@ public class SalesProposalContractOfferTests {
     }
 
     @Test
-    public void theSellerShouldBeASigner() {
+    public void theSellerShouldBeTheSigner() {
         ledger(ledgerServices, ledger -> {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {

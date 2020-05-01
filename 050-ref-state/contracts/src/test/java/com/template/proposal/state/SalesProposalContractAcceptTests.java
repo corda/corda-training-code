@@ -59,7 +59,7 @@ public class SalesProposalContractAcceptTests {
         ledger(ledgerServices, ledger -> {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {
-                tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Accept());
+                tx.command(Collections.singletonList(bob.getOwningKey()), new SalesProposalContract.Commands.Accept());
                 tx.command(Collections.singletonList(alice.getOwningKey()),
                         new MoveTokenCommand(carType, Collections.singletonList(0), Collections.singletonList(0)));
                 tx.input(aliceIssueTx.outRef(0).getRef());
@@ -91,7 +91,7 @@ public class SalesProposalContractAcceptTests {
         ledger(ledgerServices, ledger -> {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {
-                tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Accept());
+                tx.command(Collections.singletonList(bob.getOwningKey()), new SalesProposalContract.Commands.Accept());
                 tx.command(Collections.singletonList(alice.getOwningKey()),
                         new MoveTokenCommand(carType, Collections.singletonList(0), Collections.singletonList(0)));
                 tx.input(aliceIssueTx.outRef(0).getRef());
@@ -119,7 +119,7 @@ public class SalesProposalContractAcceptTests {
         ledger(ledgerServices, ledger -> {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {
-                tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Accept());
+                tx.command(Collections.singletonList(bob.getOwningKey()), new SalesProposalContract.Commands.Accept());
                 tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
                         new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2));
                 tx.command(Collections.singletonList(alice.getOwningKey()),
@@ -148,7 +148,7 @@ public class SalesProposalContractAcceptTests {
         ledger(ledgerServices, ledger -> {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {
-                tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Accept());
+                tx.command(Collections.singletonList(bob.getOwningKey()), new SalesProposalContract.Commands.Accept());
                 tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
                         new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2));
                 tx.command(Collections.singletonList(alice.getOwningKey()),
@@ -176,7 +176,7 @@ public class SalesProposalContractAcceptTests {
         ledger(ledgerServices, ledger -> {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {
-                tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Accept());
+                tx.command(Collections.singletonList(bob.getOwningKey()), new SalesProposalContract.Commands.Accept());
                 tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
                         new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2));
                 tx.command(Collections.singletonList(alice.getOwningKey()),
@@ -232,4 +232,38 @@ public class SalesProposalContractAcceptTests {
         });
     }
 
+    @Test
+    public void theBuyerShouldBeTheSigner() {
+        ledger(ledgerServices, ledger -> {
+            final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
+            ledger.transaction(tx -> {
+                tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2));
+                tx.command(Collections.singletonList(alice.getOwningKey()),
+                        new MoveTokenCommand(carType, Collections.singletonList(1), Collections.singletonList(0)));
+                tx.input(aliceIssueTx.outRef(0).getRef());
+                tx.output(NonFungibleTokenContract.Companion.getContractId(), bobNFToken);
+                tx.command(Collections.singletonList(bob.getOwningKey()),
+                        new MoveTokenCommand(mintUsd, Collections.singletonList(2), Collections.singletonList(1)));
+                tx.input(FungibleTokenContract.Companion.getContractId(), new FungibleToken(amount2, bob, null));
+                tx.output(FungibleTokenContract.Companion.getContractId(), new FungibleToken(amount2, alice, null));
+
+                tx.tweak(txCopy -> {
+                    txCopy.command(Collections.singletonList(alice.getOwningKey()),
+                            new SalesProposalContract.Commands.Accept());
+                    return txCopy.failsWith("The buyer should be the only signer on accept");
+                });
+
+                tx.tweak(txCopy -> {
+                    txCopy.command(Arrays.asList(alice.getOwningKey(), bob.getOwningKey()),
+                            new SalesProposalContract.Commands.Accept());
+                    return txCopy.failsWith("The buyer should be the only signer on accept");
+                });
+
+                tx.command(Collections.singletonList(bob.getOwningKey()), new SalesProposalContract.Commands.Accept());
+                return tx.verifies();
+            });
+            return null;
+        });
+    }
 }
