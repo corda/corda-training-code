@@ -1,6 +1,8 @@
 package com.template.proposal.flow;
 
 import co.paralleluniverse.fibers.Suspendable;
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlow;
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlowHandler;
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
@@ -24,9 +26,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.List;
-
-import static com.r3.corda.lib.tokens.workflows.utilities.NotaryUtilitiesKt.firstNotary;
-import static com.r3.corda.lib.tokens.workflows.utilities.NotaryUtilitiesKt.getPreferredNotary;
 
 public interface SalesProposalOfferFlows {
 
@@ -193,12 +192,16 @@ public interface SalesProposalOfferFlows {
             // Resolve buyer host.
             final Party buyerHost = getServiceHub().getIdentityService()
                     .requireWellKnownPartyFromAnonymous(proposal.getBuyer());
+            final FlowSession buyerSession = initiateFlow(buyerHost);
+
+            // Inform on potentially missing knowledge about the seller.
+            subFlow(new SyncKeyMappingFlow(buyerSession, Collections.singletonList(proposal.getSeller())));
 
             // Inform buyer.
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
             return subFlow(new FinalityFlow(
                     offerTx,
-                    Collections.singletonList(initiateFlow(buyerHost)),
+                    Collections.singletonList(buyerSession),
                     FINALISING_TRANSACTION.childProgressTracker()));
         }
     }
@@ -229,6 +232,7 @@ public interface SalesProposalOfferFlows {
         @Suspendable
         @Override
         public SignedTransaction call() throws FlowException {
+            subFlow(new SyncKeyMappingFlowHandler(sellerSession));
             return subFlow(new ReceiveFinalityFlow(sellerSession));
         }
     }

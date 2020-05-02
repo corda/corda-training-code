@@ -32,7 +32,7 @@ public interface SalesProposalRejectFlows {
             @NotNull
             @Override
             public ProgressTracker childProgressTracker() {
-                return SalesProposalOfferFlows.OfferFlow.tracker();
+                return RejectFlow.tracker();
             }
         };
 

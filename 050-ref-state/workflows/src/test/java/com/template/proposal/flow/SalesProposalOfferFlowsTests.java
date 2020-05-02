@@ -181,7 +181,7 @@ public class SalesProposalOfferFlowsTests {
         network.runNetwork();
         final SignedTransaction offerTx = offerFuture.get();
 
-        // Dan got the transaction.
+        // Bob got the transaction.
         final SignedTransaction savedTx = bob.getServices().getValidatedTransactions().getTransaction(offerTx.getId());
         //noinspection ConstantConditions
         assertEquals(2, savedTx.getReferences().size());
@@ -199,7 +199,7 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(expectedPrice, proposal.getPrice());
         assertEquals(bmw1, proposal.getAsset());
 
-        // Dan can find the proposal by linear id.
+        // Bob can find the proposal by linear id.
         final List<StateAndRef<SalesProposal>> foundProposals = bob.getServices().getVaultService().queryBy(
                 SalesProposal.class,
                 new QueryCriteria.LinearStateQueryCriteria()
@@ -208,7 +208,7 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(1, foundProposals.size());
         assertEquals(proposal, foundProposals.get(0).getState().getData());
 
-        // Dan can find the car type.
+        // Bob can find the car type.
         final List<StateAndRef<CarTokenType>> foundBmwTypes = bob.getServices().getVaultService().queryBy(
                 CarTokenType.class,
                 new QueryCriteria.LinearStateQueryCriteria()
@@ -217,7 +217,7 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(1, foundBmwTypes.size());
         assertEquals("abc124", foundBmwTypes.get(0).getState().getData().getVin());
 
-        // Dan can find the held car.
+        // Bob can find the held car.
         final List<StateAndRef<NonFungibleToken>> foundBmws = bob.getServices().getVaultService().queryBy(
                 NonFungibleToken.class,
                 new QueryCriteria.LinearStateQueryCriteria()
@@ -298,7 +298,7 @@ public class SalesProposalOfferFlowsTests {
         network.runNetwork();
         final SignedTransaction offerTx = offerFuture.get();
 
-        // Dan got the transaction.
+        // Bob got the transaction.
         final SignedTransaction savedTx = bob.getServices().getValidatedTransactions().getTransaction(offerTx.getId());
         //noinspection ConstantConditions
         assertEquals(2, savedTx.getReferences().size());
@@ -309,7 +309,7 @@ public class SalesProposalOfferFlowsTests {
         final SalesProposal proposal = (SalesProposal) savedTx.getTx().outRef(0).getState().getData();
         assertEquals(bmw1, proposal.getAsset());
 
-        // Dan can find the proposal by linear id.
+        // Bob can find the proposal by linear id.
         final List<StateAndRef<SalesProposal>> foundProposals = bob.getServices().getVaultService().queryBy(
                 SalesProposal.class,
                 new QueryCriteria.LinearStateQueryCriteria()
@@ -318,7 +318,7 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(1, foundProposals.size());
         assertEquals(proposal, foundProposals.get(0).getState().getData());
 
-        // Dan can find the updated car type.
+        // Bob can find the updated car type.
         final List<StateAndRef<CarTokenType>> foundBmwTypes = bob.getServices().getVaultService().queryBy(
                 CarTokenType.class,
                 new QueryCriteria.LinearStateQueryCriteria()
@@ -327,7 +327,7 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(1, foundBmwTypes.size());
         assertEquals(8_000L, foundBmwTypes.get(0).getState().getData().getMileage());
 
-        // Dan can find the held car.
+        // Bob can find the held car.
         final List<StateAndRef<NonFungibleToken>> foundBmws = bob.getServices().getVaultService().queryBy(
                 NonFungibleToken.class,
                 new QueryCriteria.LinearStateQueryCriteria()
@@ -336,4 +336,5 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(1, foundBmws.size());
         assertEquals(sellerParty, foundBmws.get(0).getState().getData().getHolder());
     }
+
 }
