@@ -7,7 +7,6 @@ import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
-import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import com.r3.corda.lib.tokens.selection.TokenQueryBy;
 import com.r3.corda.lib.tokens.selection.database.selector.DatabaseTokenSelection;
 import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensUtilitiesKt;
@@ -16,6 +15,7 @@ import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
 import com.template.proposal.state.SalesProposal;
 import com.template.proposal.state.SalesProposalContract;
 import kotlin.Pair;
+import kotlin.jvm.functions.Function1;
 import net.corda.core.contracts.*;
 import net.corda.core.crypto.SecureHash;
 import net.corda.core.flows.*;
@@ -28,6 +28,7 @@ import net.corda.core.utilities.ProgressTracker;
 import net.corda.core.utilities.ProgressTracker.Step;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Serializable;
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,6 +77,11 @@ public interface SalesProposalAcceptFlows {
             this.progressTracker = progressTracker;
         }
 
+        public AcceptSimpleFlow(
+                @NotNull final UniqueIdentifier proposalId) {
+            this(proposalId, tracker());
+        }
+
         @Suspendable
         @NotNull
         @Override
@@ -96,7 +102,7 @@ public interface SalesProposalAcceptFlows {
                 @Override
                 protected QueryCriteria getHeldByBuyer(
                         @NotNull final IssuedTokenType issuedCurrency,
-                        @NotNull final AbstractParty buyer) throws FlowException {
+                        @NotNull final AbstractParty buyer) {
                     return QueryUtilitiesKt.heldTokenAmountCriteria(issuedCurrency.getTokenType(), buyer);
                 }
             });
@@ -159,6 +165,7 @@ public interface SalesProposalAcceptFlows {
             this.progressTracker = progressTracker;
         }
 
+        @SuppressWarnings("unused")
         public AcceptFlow(@NotNull final StateAndRef<SalesProposal> proposalRef) {
             this(proposalRef, tracker());
         }
@@ -182,17 +189,15 @@ public interface SalesProposalAcceptFlows {
                             Collections.singletonList(proposal.getBuyer().getOwningKey()));
 
             progressTracker.setCurrentStep(MOVING_ASSET_TO_BUYER);
-            final PartyAndToken assetForBuyer = new PartyAndToken(proposal.getBuyer(), asset.getToken());
-            MoveTokensUtilitiesKt.addMoveNonFungibleTokens(builder, getServiceHub(), assetForBuyer, null);
+            MoveTokensUtilitiesKt.addMoveNonFungibleTokens(builder, getServiceHub(),
+                    asset.getToken().getTokenType(), proposal.getBuyer());
 
             progressTracker.setCurrentStep(PREPARING_TOKENS_FOR_PAYMENT);
             final IssuedTokenType issuedCurrency = proposal.getPrice().getToken();
             final QueryCriteria heldByBuyer = getHeldByBuyer(issuedCurrency, proposal.getBuyer());
-            final QueryCriteria properlyIssued = QueryUtilitiesKt.tokenAmountWithIssuerCriteria(
-                    issuedCurrency.getTokenType(), issuedCurrency.getIssuer());
-            // Have the utility do the "dollars to cents" conversion for us.
-            final Amount<TokenType> priceInCurrency = AmountUtilitiesKt.amount(
-                    proposal.getPrice().getQuantity(), issuedCurrency.getTokenType());
+            final Amount<TokenType> priceInCurrency = new Amount<>(
+                    proposal.getPrice().getQuantity(),
+                    proposal.getPrice().getToken());
             // Generate the buyer's currency inputs, to be spent, and the outputs, the currency tokens that will be
             // held by the seller.
             final DatabaseTokenSelection tokenSelection = new DatabaseTokenSelection(
@@ -202,7 +207,10 @@ public interface SalesProposalAcceptFlows {
                     Collections.singletonList(new Pair<>(proposal.getSeller(), priceInCurrency)),
                     // We see here that we should not rely on the default value, because the buyer keeps the change.
                     proposal.getBuyer(),
-                    new TokenQueryBy(issuedCurrency.getIssuer(), it -> true, heldByBuyer.and(properlyIssued)),
+                    new TokenQueryBy(
+                            issuedCurrency.getIssuer(),
+                            (Function1<? super StateAndRef<? extends FungibleToken>, Boolean> & Serializable) it -> true,
+                            heldByBuyer),
                     getRunId().getUuid());
             MoveTokensUtilitiesKt.addMoveTokens(builder, moniesInOut.getFirst(), moniesInOut.getSecond());
 
