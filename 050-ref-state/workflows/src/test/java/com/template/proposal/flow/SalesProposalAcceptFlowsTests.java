@@ -124,10 +124,9 @@ public class SalesProposalAcceptFlowsTests {
     private SignedTransaction createNewBmw(
             @SuppressWarnings("SameParameterValue") @NotNull final String vin,
             @SuppressWarnings("SameParameterValue") @NotNull final String make,
-            @SuppressWarnings("SameParameterValue") final long price,
             @NotNull final List<Party> observers) throws Exception {
         final IssueCarTokenTypeFlow flow = new IssueCarTokenTypeFlow(notary.getInfo().getLegalIdentities().get(0),
-                vin, make, price, observers);
+                vin, make, observers);
         final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
         network.runNetwork();
         return future.get();
@@ -149,9 +148,8 @@ public class SalesProposalAcceptFlowsTests {
     private SignedTransaction updateMileageOn(
             @NotNull final StateAndRef<CarTokenType> carRef,
             @SuppressWarnings("SameParameterValue") final long mileage,
-            final long price,
             @NotNull final List<Party> observers) throws Exception {
-        final UpdateCarTokenTypeFlow flow = new UpdateCarTokenTypeFlow(carRef, mileage, price, observers);
+        final UpdateCarTokenTypeFlow flow = new UpdateCarTokenTypeFlow(carRef, mileage, observers);
         final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
         network.runNetwork();
         return future.get();
@@ -168,7 +166,7 @@ public class SalesProposalAcceptFlowsTests {
         final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
         informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
         // The car.
-        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW", 25_000L,
+        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW",
                 Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
         final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
@@ -193,7 +191,7 @@ public class SalesProposalAcceptFlowsTests {
         network.runNetwork();
         issueFuture.get();
         // Dmv changes the car with informing the buyer only.
-        updateMileageOn(bmwType, 8_000L, 22_000L,
+        updateMileageOn(bmwType, 8_000L,
                 Collections.singletonList(bob.getInfo().getLegalIdentities().get(0)));
 
         // Buyer accepts.
@@ -250,7 +248,7 @@ public class SalesProposalAcceptFlowsTests {
         final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
         informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
         // The car.
-        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW", 25_000L,
+        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW",
                 Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
         final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
@@ -275,7 +273,7 @@ public class SalesProposalAcceptFlowsTests {
         network.runNetwork();
         issueFuture.get();
         // Dmv changes the car with informing only the seller.
-        updateMileageOn(bmwType, 8_000L, 22_000L,
+        updateMileageOn(bmwType, 8_000L,
                 Collections.singletonList(alice.getInfo().getLegalIdentities().get(0)));
 
         // Buyer accepts.
@@ -300,7 +298,7 @@ public class SalesProposalAcceptFlowsTests {
         final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
         informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
         // The car.
-        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW", 25_000L,
+        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW",
                 Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
         final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
