@@ -148,14 +148,14 @@ public interface SalesProposalOfferFlows {
         @NotNull
         private final Amount<IssuedTokenType> price;
         @NotNull
-        private final Instant lastValidity;
+        private final Instant expirationDate;
         @NotNull
         private final ProgressTracker progressTracker;
 
         public OfferFlow(@NotNull final StateAndRef<NonFungibleToken> asset,
                          @NotNull final AbstractParty buyer,
                          @NotNull final Amount<IssuedTokenType> price,
-                         @NotNull final Instant lastValidity,
+                         @NotNull final Instant expirationDate,
                          @NotNull final ProgressTracker progressTracker) {
             //noinspection ConstantConditions
             if (asset == null) throw new NullPointerException("The asset cannot be null");
@@ -164,13 +164,13 @@ public interface SalesProposalOfferFlows {
             //noinspection ConstantConditions
             if (price == null) throw new NullPointerException("The price cannot be null");
             //noinspection ConstantConditions
-            if (lastValidity == null) throw new NullPointerException("The lastValidity cannot be null");
+            if (expirationDate == null) throw new NullPointerException("The expirationDate cannot be null");
             //noinspection ConstantConditions
             if (progressTracker == null) throw new NullPointerException("The progressTracker cannot be null");
             this.asset = asset;
             this.buyer = buyer;
             this.price = price;
-            this.lastValidity = lastValidity;
+            this.expirationDate = expirationDate;
             this.progressTracker = progressTracker;
         }
 
@@ -178,18 +178,18 @@ public interface SalesProposalOfferFlows {
         public OfferFlow(@NotNull final StateAndRef<NonFungibleToken> asset,
                          @NotNull final AbstractParty buyer,
                          @NotNull final Amount<IssuedTokenType> price,
-                         @NotNull final Instant lastValidity) {
-            this(asset, buyer, price, lastValidity, tracker());
+                         @NotNull final Instant expirationDate) {
+            this(asset, buyer, price, expirationDate, tracker());
         }
 
         @Suspendable
         @Override
         public SignedTransaction call() throws FlowException {
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
-            final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), asset, buyer, price, lastValidity);
+            final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), asset, buyer, price, expirationDate);
             final TransactionBuilder builder = new TransactionBuilder(asset.getState().getNotary())
                     .addOutputState(proposal)
-                    .setTimeWindow(TimeWindow.untilOnly(lastValidity.minus(Duration.ofSeconds(1))))
+                    .setTimeWindow(TimeWindow.untilOnly(expirationDate.minus(Duration.ofSeconds(1))))
                     .addReferenceState(new ReferencedStateAndRef<>(asset))
                     .addCommand(new SalesProposalContract.Commands.Offer(),
                             Collections.singletonList(proposal.getSeller().getOwningKey()));

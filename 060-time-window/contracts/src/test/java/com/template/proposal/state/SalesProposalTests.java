@@ -76,7 +76,7 @@ public class SalesProposalTests {
     }
 
     @Test(expected = NullPointerException.class)
-    public void cannotConstructWithNullLastValidity() {
+    public void cannotConstructWithNullExpirationDate() {
         //noinspection ConstantConditions
         new SalesProposal(new UniqueIdentifier(), aliceRef1, bob, amount1, null);
     }
@@ -104,7 +104,7 @@ public class SalesProposalTests {
         assertEquals(alice, proposal.getSeller());
         assertEquals(carly, proposal.getBuyer());
         assertEquals(amount1, proposal.getPrice());
-        assertEquals(oneMinuteAway, proposal.getLastValidity());
+        assertEquals(oneMinuteAway, proposal.getExpirationDate());
     }
 
     @Test

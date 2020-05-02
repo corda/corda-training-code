@@ -294,7 +294,7 @@ public class SalesProposalContractAcceptTests {
 
                 tx.tweak(txCopy -> {
                     txCopy.timeWindow(Instant.now(), Duration.ofMinutes(10));
-                    return txCopy.failsWith("The buyer can accept only before the last validity");
+                    return txCopy.failsWith("The buyer can accept only before the expiration date");
                 });
 
                 tx.timeWindow(Instant.now(), Duration.ofMinutes(1));

@@ -28,14 +28,14 @@ public class SalesProposal implements LinearState {
     @NotNull
     private final Amount<IssuedTokenType> price;
     @NotNull
-    private final Instant lastValidity;
+    private final Instant expirationDate;
 
     public SalesProposal(
             @NotNull final UniqueIdentifier linearId,
             @NotNull final StateAndRef<NonFungibleToken> asset,
             @NotNull final AbstractParty buyer,
             @NotNull final Amount<IssuedTokenType> price,
-            @NotNull final Instant lastValidity) {
+            @NotNull final Instant expirationDate) {
         //noinspection ConstantConditions
         if (linearId == null) throw new NullPointerException("linearId cannot be null");
         //noinspection ConstantConditions
@@ -45,14 +45,14 @@ public class SalesProposal implements LinearState {
         //noinspection ConstantConditions
         if (price == null) throw new NullPointerException("price cannot be null");
         //noinspection ConstantConditions
-        if (lastValidity == null) throw new NullPointerException("lastValidity cannot be null");
+        if (expirationDate == null) throw new NullPointerException("expirationDate cannot be null");
         this.linearId = linearId;
         this.asset = asset;
         this.assetId = asset.getState().getData().getLinearId();
         this.seller = asset.getState().getData().getHolder();
         this.buyer = buyer;
         this.price = price;
-        this.lastValidity = lastValidity;
+        this.expirationDate = expirationDate;
     }
 
     @NotNull
@@ -93,8 +93,8 @@ public class SalesProposal implements LinearState {
     }
 
     @NotNull
-    public Instant getLastValidity() {
-        return lastValidity;
+    public Instant getExpirationDate() {
+        return expirationDate;
     }
 
     @Override
@@ -107,11 +107,11 @@ public class SalesProposal implements LinearState {
                 seller.equals(that.seller) &&
                 buyer.equals(that.buyer) &&
                 price.equals(that.price) &&
-                lastValidity.equals(that.lastValidity);
+                expirationDate.equals(that.expirationDate);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(linearId, asset, seller, buyer, price, lastValidity);
+        return Objects.hash(linearId, asset, seller, buyer, price, expirationDate);
     }
 }
