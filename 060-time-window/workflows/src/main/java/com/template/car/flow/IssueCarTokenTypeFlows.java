@@ -31,7 +31,6 @@ public interface IssueCarTokenTypeFlows {
         private final String vin;
         @NotNull
         private final String make;
-        private final long price;
         @NotNull
         private final List<Party> observers;
 
@@ -39,7 +38,6 @@ public interface IssueCarTokenTypeFlows {
                 @NotNull final Party notary,
                 @NotNull final String vin,
                 @NotNull final String make,
-                final long price,
                 @NotNull final List<Party> observers) {
             //noinspection ConstantConditions
             if (notary == null) throw new NullPointerException("The notary cannot be null");
@@ -52,7 +50,6 @@ public interface IssueCarTokenTypeFlows {
             this.notary = notary;
             this.vin = vin;
             this.make = make;
-            this.price = price;
             this.observers = observers;
         }
 

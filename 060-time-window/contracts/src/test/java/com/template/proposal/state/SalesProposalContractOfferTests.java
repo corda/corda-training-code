@@ -18,6 +18,8 @@ import net.corda.testing.core.TestIdentity;
 import net.corda.testing.node.MockServices;
 import org.junit.Test;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -53,6 +55,7 @@ public class SalesProposalContractOfferTests {
     private final NonFungibleToken bobNFToken = new NonFungibleToken(
             carType, bob, new UniqueIdentifier(), null);
     private final FungibleToken bobFToken = new FungibleToken(amount1, bob, null);
+    private final Instant tenMinutesAway = Instant.now().plus(Duration.ofMinutes(10));
 
     @Test
     public void thereShouldBeASingleSalesProposalCommand() {
@@ -64,7 +67,9 @@ public class SalesProposalContractOfferTests {
                 tx.reference(aliceIssueTx.outRef(0).getRef());
                 tx.output(
                         SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
                 tx.failsWith("There should be a single sales proposal command");
 
                 tx.command(Collections.singletonList(alice.getOwningKey()),
@@ -99,7 +104,9 @@ public class SalesProposalContractOfferTests {
             ledger.transaction(tx -> {
                 tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Offer());
                 tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
                 tx.failsWith("There should be a single reference input token on offer");
 
                 tx.reference(aliceIssueTx.outRef(0).getRef());
@@ -121,11 +128,14 @@ public class SalesProposalContractOfferTests {
                 tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Offer());
                 tx.reference(aliceIssueTx.outRef(0).getRef());
                 tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
                 tx.verifies();
 
                 tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
                 return tx.failsWith("There should be no sales proposal inputs on offer");
             });
             return null;
@@ -141,14 +151,17 @@ public class SalesProposalContractOfferTests {
                 tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID, new DummyState(alice, bob));
                 tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Offer());
                 tx.reference(aliceIssueTx.outRef(0).getRef());
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
                 tx.failsWith("There should be a single sales proposal output on offer");
 
                 tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
                 tx.verifies();
 
                 tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), bobIssueTx.outRef(0), carly, amount3, validity));
+                        new SalesProposal(new UniqueIdentifier(), bobIssueTx.outRef(0),
+                                carly, amount3, tenMinutesAway));
                 return tx.failsWith("There should be a single sales proposal output on offer");
             });
             return null;
@@ -163,16 +176,19 @@ public class SalesProposalContractOfferTests {
             ledger.transaction(tx -> {
                 tx.reference(aliceIssueTx1.outRef(0).getRef());
                 tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Offer());
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
 
                 tx.tweak(txCopy -> {
                     txCopy.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                            new SalesProposal(new UniqueIdentifier(), aliceIssueTx2.outRef(0), carly, amount3, validity));
+                            new SalesProposal(new UniqueIdentifier(), aliceIssueTx2.outRef(0),
+                                    carly, amount3, tenMinutesAway));
                     return txCopy.failsWith(
                             "The reference token should match the sales proposal output asset");
                 });
 
                 tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx1.outRef(0), bob, amount2, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx1.outRef(0),
+                                bob, amount2, tenMinutesAway));
                 return tx.verifies();
             });
             return null;
@@ -186,16 +202,60 @@ public class SalesProposalContractOfferTests {
             ledger.transaction(tx -> {
                 tx.reference(aliceIssueTx.outRef(0).getRef());
                 tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Offer());
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
 
                 tx.tweak(txCopy -> {
                     txCopy.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
                             new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
-                                    bob, new Amount<>(0L, mintUsd), validity));
+                                    bob, new Amount<>(0L, mintUsd), tenMinutesAway));
                     return txCopy.failsWith("The sales proposal offer price should not be zero");
                 });
 
                 tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
+                return tx.verifies();
+            });
+            return null;
+        });
+    }
+
+    @Test
+    public void thereShouldBeATimeWindow() {
+        ledger(ledgerServices, ledger -> {
+            final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
+            ledger.transaction(tx -> {
+                tx.reference(aliceIssueTx.outRef(0).getRef());
+                tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Offer());
+                tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
+                tx.failsWith("There should be a future-bounded time window");
+
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
+                return tx.verifies();
+            });
+            return null;
+        });
+    }
+
+    @Test
+    public void theLastValidityShouldBeAfterTheTimeWindow() {
+        ledger(ledgerServices, ledger -> {
+            final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
+            ledger.transaction(tx -> {
+                tx.reference(aliceIssueTx.outRef(0).getRef());
+                tx.command(Collections.singletonList(alice.getOwningKey()), new SalesProposalContract.Commands.Offer());
+                tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
+
+                tx.tweak(txCopy -> {
+                    txCopy.timeWindow(Instant.now(), Duration.ofMinutes(10));
+                    return txCopy.failsWith("The last validity should be in the future");
+                });
+
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
                 return tx.verifies();
             });
             return null;
@@ -209,7 +269,9 @@ public class SalesProposalContractOfferTests {
             ledger.transaction(tx -> {
                 tx.reference(aliceIssueTx.outRef(0).getRef());
                 tx.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount2, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount2, tenMinutesAway));
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
 
                 tx.tweak(txCopy -> {
                     txCopy.command(Collections.singletonList(bob.getOwningKey()),

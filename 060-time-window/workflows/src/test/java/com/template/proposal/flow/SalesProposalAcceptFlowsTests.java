@@ -178,7 +178,7 @@ public class SalesProposalAcceptFlowsTests {
         // Seller makes an offer.
         final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
-                usMint.getInfo().getLegalIdentities().get(0));
+                usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
         network.runNetwork();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
@@ -260,7 +260,7 @@ public class SalesProposalAcceptFlowsTests {
         // Seller makes an offer.
         final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
-                usMint.getInfo().getLegalIdentities().get(0));
+                usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
         network.runNetwork();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
@@ -310,7 +310,7 @@ public class SalesProposalAcceptFlowsTests {
         // Seller makes an offer.
         final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
-                usMint.getInfo().getLegalIdentities().get(0));
+                usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
         network.runNetwork();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);

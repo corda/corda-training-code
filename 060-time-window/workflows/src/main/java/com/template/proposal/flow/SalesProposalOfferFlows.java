@@ -10,10 +10,7 @@ import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.template.proposal.state.SalesProposal;
 import com.template.proposal.state.SalesProposalContract;
-import net.corda.core.contracts.Amount;
-import net.corda.core.contracts.ReferencedStateAndRef;
-import net.corda.core.contracts.StateAndRef;
-import net.corda.core.contracts.UniqueIdentifier;
+import net.corda.core.contracts.*;
 import net.corda.core.flows.*;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.Party;
@@ -24,6 +21,8 @@ import net.corda.core.utilities.ProgressTracker;
 import net.corda.core.utilities.ProgressTracker.Step;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
@@ -59,6 +58,7 @@ public interface SalesProposalOfferFlows {
         private final TokenType currency;
         @NotNull
         private final Party issuer;
+        private final long validForSeconds;
         @NotNull
         private final ProgressTracker progressTracker;
 
@@ -67,6 +67,7 @@ public interface SalesProposalOfferFlows {
                                final long price,
                                @NotNull final String currencyCode,
                                @NotNull final Party issuer,
+                               final long validForSeconds,
                                @NotNull final ProgressTracker progressTracker) {
             //noinspection ConstantConditions
             if (assetId == null) throw new NullPointerException("The assetId cannot be null");
@@ -83,6 +84,7 @@ public interface SalesProposalOfferFlows {
             this.price = price;
             this.currency = FiatCurrency.Companion.getInstance(currencyCode);
             this.issuer = issuer;
+            this.validForSeconds = validForSeconds;
             this.progressTracker = progressTracker;
         }
 
@@ -90,8 +92,9 @@ public interface SalesProposalOfferFlows {
                                @NotNull final AbstractParty buyer,
                                final long price,
                                @NotNull final String currencyCode,
-                               @NotNull final Party issuer) {
-            this(assetId, buyer, price, currencyCode, issuer, tracker());
+                               @NotNull final Party issuer,
+                               final long validForSeconds) {
+            this(assetId, buyer, price, currencyCode, issuer, validForSeconds, tracker());
         }
 
         @Suspendable
@@ -109,6 +112,7 @@ public interface SalesProposalOfferFlows {
             progressTracker.setCurrentStep(PASSING_ON);
             return subFlow(new OfferFlow(asset, buyer,
                     AmountUtilitiesKt.amount(price, new IssuedTokenType(issuer, currency)),
+                    Instant.now().plus(Duration.ofSeconds(validForSeconds)),
                     PASSING_ON.childProgressTracker()));
         }
     }
@@ -144,11 +148,14 @@ public interface SalesProposalOfferFlows {
         @NotNull
         private final Amount<IssuedTokenType> price;
         @NotNull
+        private final Instant lastValidity;
+        @NotNull
         private final ProgressTracker progressTracker;
 
         public OfferFlow(@NotNull final StateAndRef<NonFungibleToken> asset,
                          @NotNull final AbstractParty buyer,
                          @NotNull final Amount<IssuedTokenType> price,
+                         @NotNull final Instant lastValidity,
                          @NotNull final ProgressTracker progressTracker) {
             //noinspection ConstantConditions
             if (asset == null) throw new NullPointerException("The asset cannot be null");
@@ -157,27 +164,32 @@ public interface SalesProposalOfferFlows {
             //noinspection ConstantConditions
             if (price == null) throw new NullPointerException("The price cannot be null");
             //noinspection ConstantConditions
+            if (lastValidity == null) throw new NullPointerException("The lastValidity cannot be null");
+            //noinspection ConstantConditions
             if (progressTracker == null) throw new NullPointerException("The progressTracker cannot be null");
             this.asset = asset;
             this.buyer = buyer;
             this.price = price;
+            this.lastValidity = lastValidity;
             this.progressTracker = progressTracker;
         }
 
         @SuppressWarnings("unused")
         public OfferFlow(@NotNull final StateAndRef<NonFungibleToken> asset,
                          @NotNull final AbstractParty buyer,
-                         @NotNull final Amount<IssuedTokenType> price) {
-            this(asset, buyer, price, tracker());
+                         @NotNull final Amount<IssuedTokenType> price,
+                         @NotNull final Instant lastValidity) {
+            this(asset, buyer, price, lastValidity, tracker());
         }
 
         @Suspendable
         @Override
         public SignedTransaction call() throws FlowException {
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
-            final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), asset, buyer, price, validity);
+            final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), asset, buyer, price, lastValidity);
             final TransactionBuilder builder = new TransactionBuilder(asset.getState().getNotary())
                     .addOutputState(proposal)
+                    .setTimeWindow(TimeWindow.untilOnly(lastValidity.minus(Duration.ofSeconds(1))))
                     .addReferenceState(new ReferencedStateAndRef<>(asset))
                     .addCommand(new SalesProposalContract.Commands.Offer(),
                             Collections.singletonList(proposal.getSeller().getOwningKey()));

@@ -15,6 +15,8 @@ import net.corda.testing.core.TestIdentity;
 import net.corda.testing.node.MockServices;
 import org.junit.Test;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -45,6 +47,7 @@ public class SalesProposalContractRejectTests {
     private final Amount<IssuedTokenType> amount1 = new Amount<>(20L, mintUsd);
     private final NonFungibleToken aliceNFToken = new NonFungibleToken(
             carType, alice, new UniqueIdentifier(), null);
+    private final Instant tenMinutesAgo = Instant.now().minus(Duration.ofMinutes(10));
 
     @Test
     public void thereShouldBeASingleInputSalesProposal() {
@@ -54,12 +57,15 @@ public class SalesProposalContractRejectTests {
                 tx.command(Collections.singletonList(alice.getOwningKey()),
                         new SalesProposalContract.Commands.Reject());
                 tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount1, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount1, tenMinutesAgo));
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
                 tx.verifies();
 
                 return tx.tweak(txCopy -> {
                     txCopy.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                            new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount1, validity));
+                            new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                    bob, amount1, tenMinutesAgo));
                     return txCopy.failsWith("There should be a single input sales proposal on reject");
                 });
             });
@@ -75,14 +81,75 @@ public class SalesProposalContractRejectTests {
                 tx.command(Collections.singletonList(alice.getOwningKey()),
                         new SalesProposalContract.Commands.Reject());
                 tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount1, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount1, tenMinutesAgo));
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
                 tx.verifies();
 
                 return tx.tweak(txCopy -> {
                     txCopy.output(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                            new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount1, validity));
+                            new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                    bob, amount1, tenMinutesAgo));
                     return txCopy.failsWith("There should be no sales proposal outputs on reject");
                 });
+            });
+            return null;
+        });
+    }
+
+    @Test
+    public void theBuyerCanRejectAtAnyTime() {
+        ledger(ledgerServices, ledger -> {
+            final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
+            ledger.transaction(tx -> {
+                tx.command(Collections.singletonList(bob.getOwningKey()),
+                        new SalesProposalContract.Commands.Reject());
+                tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount1, Instant.now()));
+                return tx.verifies();
+            });
+            return null;
+        });
+    }
+
+    @Test
+    public void thereShouldBeATimeWindowForSeller() {
+        ledger(ledgerServices, ledger -> {
+            final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
+            ledger.transaction(tx -> {
+                tx.command(Collections.singletonList(alice.getOwningKey()),
+                        new SalesProposalContract.Commands.Reject());
+                tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount1, tenMinutesAgo));
+                tx.failsWith("There should be a past-bounded time window");
+
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
+                return tx.verifies();
+            });
+            return null;
+        });
+    }
+
+    @Test
+    public void theSellerCanRejectOnlyAfterValidity() {
+        ledger(ledgerServices, ledger -> {
+            final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
+            ledger.transaction(tx -> {
+                tx.command(Collections.singletonList(alice.getOwningKey()),
+                        new SalesProposalContract.Commands.Reject());
+                tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount1, tenMinutesAgo));
+
+                tx.tweak(txCopy -> {
+                    txCopy.timeWindow(tenMinutesAgo, Duration.ofMinutes(1));
+                    return txCopy.failsWith("The seller can reject only after the last validity");
+                });
+
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
+                return tx.verifies();
             });
             return null;
         });
@@ -94,7 +161,9 @@ public class SalesProposalContractRejectTests {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {
                 tx.input(SalesProposalContract.SALES_PROPOSAL_CONTRACT_ID,
-                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0), bob, amount1, validity));
+                        new SalesProposal(new UniqueIdentifier(), aliceIssueTx.outRef(0),
+                                bob, amount1, tenMinutesAgo));
+                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
 
                 tx.tweak(txCopy -> {
                     txCopy.command(Collections.singletonList(carly.getOwningKey()),

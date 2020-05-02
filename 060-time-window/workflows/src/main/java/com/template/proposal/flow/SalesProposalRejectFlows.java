@@ -4,6 +4,7 @@ import co.paralleluniverse.fibers.Suspendable;
 import com.template.proposal.state.SalesProposal;
 import com.template.proposal.state.SalesProposalContract;
 import net.corda.core.contracts.StateAndRef;
+import net.corda.core.contracts.TimeWindow;
 import net.corda.core.contracts.UniqueIdentifier;
 import net.corda.core.flows.*;
 import net.corda.core.identity.AbstractParty;
@@ -14,6 +15,7 @@ import net.corda.core.transactions.TransactionBuilder;
 import net.corda.core.utilities.ProgressTracker;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -151,10 +153,14 @@ public interface SalesProposalRejectFlows {
         @Override
         public SignedTransaction call() throws FlowException {
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
+            final SalesProposal proposalState = proposal.getState().getData();
             final TransactionBuilder builder = new TransactionBuilder(proposal.getState().getNotary())
                     .addInputState(proposal)
                     .addCommand(new SalesProposalContract.Commands.Reject(),
                             Collections.singletonList(rejecter.getOwningKey()));
+            if (proposalState.getSeller().equals(rejecter)) {
+                builder.setTimeWindow(TimeWindow.fromOnly(Instant.now()));
+            }
 
             progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
             builder.verify(getServiceHub());

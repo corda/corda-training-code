@@ -12,6 +12,9 @@ import net.corda.core.identity.Party;
 import net.corda.testing.core.TestIdentity;
 import org.junit.Test;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
@@ -46,52 +49,62 @@ public class SalesProposalTests {
     private final StateAndRef<NonFungibleToken> bobRef1 = new StateAndRef<>(
             new TransactionState<>(bobNFToken, notary),
             new StateRef(SecureHash.randomSHA256(), 0));
+    private final Instant oneMinuteAway = Instant.now().plus(Duration.ofMinutes(1));
 
     @Test(expected = NullPointerException.class)
     public void cannotConstructWithNullLinearId() {
         //noinspection ConstantConditions
-        new SalesProposal(null, aliceRef1, bob, amount1, validity);
+        new SalesProposal(null, aliceRef1, bob, amount1, oneMinuteAway);
     }
 
     @Test(expected = NullPointerException.class)
     public void cannotConstructWithNullAsset() {
         //noinspection ConstantConditions
-        new SalesProposal(new UniqueIdentifier(), null, bob, amount1, validity);
+        new SalesProposal(new UniqueIdentifier(), null, bob, amount1, oneMinuteAway);
     }
 
     @Test(expected = NullPointerException.class)
-    public void cannotConstructWithNullBuer() {
+    public void cannotConstructWithNullBuyer() {
         //noinspection ConstantConditions
-        new SalesProposal(new UniqueIdentifier(), aliceRef1, null, amount1, validity);
+        new SalesProposal(new UniqueIdentifier(), aliceRef1, null, amount1, oneMinuteAway);
     }
 
     @Test(expected = NullPointerException.class)
     public void cannotConstructWithNullPrice() {
         //noinspection ConstantConditions
-        new SalesProposal(new UniqueIdentifier(), aliceRef1, bob, null, validity);
+        new SalesProposal(new UniqueIdentifier(), aliceRef1, bob, null, oneMinuteAway);
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void cannotConstructWithNullLastValidity() {
+        //noinspection ConstantConditions
+        new SalesProposal(new UniqueIdentifier(), aliceRef1, bob, amount1, null);
     }
 
     @Test
     public void canConstructWithSameSellerAndBuyer() {
-        final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), aliceRef1, alice, amount1, validity);
+        final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), aliceRef1,
+                alice, amount1, oneMinuteAway);
         assertEquals(proposal.getSeller(), proposal.getBuyer());
     }
 
     @Test
     public void participantsAreBoth() {
-        final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), aliceRef1, bob, amount1, validity);
+        final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), aliceRef1,
+                bob, amount1, oneMinuteAway);
         assertEquals(proposal.getParticipants(), Arrays.asList(alice, bob));
     }
 
     @Test
     public void gettersWork() {
         final UniqueIdentifier linearId = new UniqueIdentifier();
-        final SalesProposal proposal = new SalesProposal(linearId, aliceRef1, carly, amount1, validity);
+        final SalesProposal proposal = new SalesProposal(linearId, aliceRef1, carly, amount1, oneMinuteAway);
         assertEquals(linearId, proposal.getLinearId());
         assertEquals(aliceRef1, proposal.getAsset());
         assertEquals(alice, proposal.getSeller());
         assertEquals(carly, proposal.getBuyer());
         assertEquals(amount1, proposal.getPrice());
+        assertEquals(oneMinuteAway, proposal.getLastValidity());
     }
 
     @Test
@@ -99,23 +112,27 @@ public class SalesProposalTests {
         final UniqueIdentifier linearId1 = new UniqueIdentifier();
         final UniqueIdentifier linearId2 = new UniqueIdentifier();
         assertEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity),
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity));
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway),
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway));
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity),
-                new SalesProposal(linearId2, aliceRef1, bob, amount1, validity));
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway),
+                new SalesProposal(linearId2, aliceRef1, bob, amount1, oneMinuteAway));
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity),
-                new SalesProposal(linearId1, aliceRef2, bob, amount1, validity));
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway),
+                new SalesProposal(linearId1, aliceRef2, bob, amount1, oneMinuteAway));
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, carly, amount1, validity),
-                new SalesProposal(linearId1, bobRef1, carly, amount1, validity));
+                new SalesProposal(linearId1, aliceRef1, carly, amount1, oneMinuteAway),
+                new SalesProposal(linearId1, bobRef1, carly, amount1, oneMinuteAway));
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity),
-                new SalesProposal(linearId1, aliceRef1, carly, amount1, validity));
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway),
+                new SalesProposal(linearId1, aliceRef1, carly, amount1, oneMinuteAway));
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity),
-                new SalesProposal(linearId1, aliceRef1, bob, amount2, validity));
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway),
+                new SalesProposal(linearId1, aliceRef1, bob, amount2, oneMinuteAway));
+        assertNotEquals(
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway),
+                new SalesProposal(linearId1, aliceRef1, bob, amount1,
+                        Instant.now().plus(2, ChronoUnit.MINUTES)));
     }
 
     @Test
@@ -123,23 +140,27 @@ public class SalesProposalTests {
         final UniqueIdentifier linearId1 = new UniqueIdentifier();
         final UniqueIdentifier linearId2 = new UniqueIdentifier();
         assertEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity).hashCode(),
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity).hashCode());
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway).hashCode(),
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway).hashCode());
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity).hashCode(),
-                new SalesProposal(linearId2, aliceRef1, bob, amount1, validity).hashCode());
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway).hashCode(),
+                new SalesProposal(linearId2, aliceRef1, bob, amount1, oneMinuteAway).hashCode());
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity).hashCode(),
-                new SalesProposal(linearId1, aliceRef2, bob, amount1, validity).hashCode());
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway).hashCode(),
+                new SalesProposal(linearId1, aliceRef2, bob, amount1, oneMinuteAway).hashCode());
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, carly, amount1, validity).hashCode(),
-                new SalesProposal(linearId1, bobRef1, carly, amount1, validity).hashCode());
+                new SalesProposal(linearId1, aliceRef1, carly, amount1, oneMinuteAway).hashCode(),
+                new SalesProposal(linearId1, bobRef1, carly, amount1, oneMinuteAway).hashCode());
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity).hashCode(),
-                new SalesProposal(linearId1, aliceRef1, carly, amount1, validity).hashCode());
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway).hashCode(),
+                new SalesProposal(linearId1, aliceRef1, carly, amount1, oneMinuteAway).hashCode());
         assertNotEquals(
-                new SalesProposal(linearId1, aliceRef1, bob, amount1, validity).hashCode(),
-                new SalesProposal(linearId1, aliceRef1, bob, amount2, validity).hashCode());
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway).hashCode(),
+                new SalesProposal(linearId1, aliceRef1, bob, amount2, oneMinuteAway).hashCode());
+        assertNotEquals(
+                new SalesProposal(linearId1, aliceRef1, bob, amount1, oneMinuteAway).hashCode(),
+                new SalesProposal(linearId1, aliceRef1, bob, amount1,
+                        Instant.now().plus(2, ChronoUnit.MINUTES)).hashCode());
     }
 
 }

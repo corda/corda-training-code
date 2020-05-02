@@ -10,7 +10,6 @@ import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.r3.corda.lib.tokens.selection.TokenQueryBy;
 import com.r3.corda.lib.tokens.selection.database.selector.DatabaseTokenSelection;
 import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensUtilitiesKt;
-import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
 import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
 import com.template.proposal.state.SalesProposal;
 import com.template.proposal.state.SalesProposalContract;

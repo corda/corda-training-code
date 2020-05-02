@@ -49,6 +49,12 @@ public class SalesProposalContract implements Contract {
                         proposal.getAsset().equals(refToken));
                 req.using("The sales proposal offer price should not be zero",
                         0 < proposal.getPrice().getQuantity());
+                req.using("There should be a future-bounded time window",
+                        tx.getTimeWindow() != null &&
+                                tx.getTimeWindow().getUntilTime() != null);
+                //noinspection ConstantConditions
+                req.using("The last validity should be in the future",
+                        tx.getTimeWindow().getUntilTime().isBefore(proposal.getLastValidity()));
                 req.using("The seller should be the only signer on the offer",
                         Collections.singletonList(proposal.getSeller().getOwningKey()).equals(command.getSigners()));
             } else if (command.getValue() instanceof Commands.Accept) {
@@ -73,6 +79,12 @@ public class SalesProposalContract implements Contract {
                         .reduce(0L, Math::addExact);
                 req.using("The seller should be paid the agreed amount in the agreed issued token on accept",
                         proposal.getPrice().getQuantity() <= sellerPayment);
+                req.using("There should be a future-bounded time window",
+                        tx.getTimeWindow() != null &&
+                                tx.getTimeWindow().getUntilTime() != null);
+                //noinspection ConstantConditions
+                req.using("The buyer can accept only before the last validity",
+                        tx.getTimeWindow().getUntilTime().isBefore(proposal.getLastValidity()));
                 req.using("The buyer should be the only signer on accept",
                         Collections.singletonList(proposal.getBuyer().getOwningKey()).equals(command.getSigners()));
             } else if (command.getValue() instanceof Commands.Reject) {
@@ -81,6 +93,15 @@ public class SalesProposalContract implements Contract {
                 req.using("There should be no sales proposal outputs on reject",
                         outSalesProposals.isEmpty());
                 final SalesProposal proposal = inSalesProposals.get(0).getState().getData();
+                if (command.getSigners().contains(proposal.getSeller().getOwningKey())) {
+                    req.using("There should be a past-bounded time window",
+                            tx.getTimeWindow() != null &&
+                                    tx.getTimeWindow().getFromTime() != null);
+                    //noinspection ConstantConditions
+                    req.using("The seller can reject only after the last validity",
+                            proposal.getLastValidity().isBefore(tx.getTimeWindow().getFromTime()));
+                    // The buyer can reject at any time.
+                }
                 req.using("The seller or the buyer or both should be signers",
                         command.getSigners().contains(proposal.getSeller().getOwningKey()) ||
                                 command.getSigners().contains(proposal.getBuyer().getOwningKey()));
