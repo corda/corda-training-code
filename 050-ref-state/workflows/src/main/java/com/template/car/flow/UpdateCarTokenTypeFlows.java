@@ -88,7 +88,7 @@ public interface UpdateCarTokenTypeFlows {
         public SignedTransaction call() throws FlowException {
             final CarTokenType car = carRef.getState().getData();
             final CarTokenType updatedCar = new CarTokenType(car.getMaintainers(), car.getLinearId(),
-                    car.getVin(), car.getMake(), mileage, price);
+                    car.getVin(), car.getMake(), mileage);
             return subFlow(new UpdateEvolvableToken(carRef, updatedCar, observers));
         }
     }

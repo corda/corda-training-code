@@ -23,23 +23,20 @@ public class CarTokenType extends EvolvableTokenType {
     @NotNull
     private final String make;
     private final long mileage;
-    private final long price;
 
     public CarTokenType(@NotNull final List<Party> maintainers, @NotNull final UniqueIdentifier uniqueIdentifier,
                         @NotNull final String vin, @NotNull final String make,
-                        final long mileage, final long price) {
+                        final long mileage) {
         Validate.notNull(maintainers, "Maintainer cannot be empty.");
         Validate.notNull(uniqueIdentifier, "Unique identifier cannot be empty.");
         Validate.notBlank(vin, "VIN cannot be empty.");
         Validate.notBlank(make, "Make cannot be empty.");
         Validate.isTrue(mileage >= 0, "Mileage cannot be negative.");
-        Validate.isTrue(price > 0, "Price cannot be 0.");
         this.maintainers = maintainers;
         this.uniqueIdentifier = uniqueIdentifier;
         this.vin = vin;
         this.make = make;
         this.mileage = mileage;
-        this.price = price;
     }
 
     @Override
@@ -73,10 +70,6 @@ public class CarTokenType extends EvolvableTokenType {
         return mileage;
     }
 
-    public long getPrice() {
-        return price;
-    }
-
     // We require `equals()` and `hashCode` to properly group Tokens, and also to be able to use
     // them in a HashMap.
     @Override
@@ -86,7 +79,6 @@ public class CarTokenType extends EvolvableTokenType {
         final CarTokenType that = (CarTokenType) o;
         return getFractionDigits() == that.getFractionDigits() &&
                 Double.compare(that.getMileage(), getMileage()) == 0 &&
-                Double.compare(that.getPrice(), getPrice()) == 0 &&
                 maintainers.equals(that.maintainers) &&
                 uniqueIdentifier.equals(that.uniqueIdentifier) &&
                 getVin().equals(that.getVin()) &&
@@ -95,7 +87,6 @@ public class CarTokenType extends EvolvableTokenType {
 
     @Override
     public int hashCode() {
-        return Objects.hash(getFractionDigits(), maintainers, uniqueIdentifier, getVin(), getMake(),
-                getMileage(), getPrice());
+        return Objects.hash(getFractionDigits(), maintainers, uniqueIdentifier, getVin(), getMake(), getMileage());
     }
 }

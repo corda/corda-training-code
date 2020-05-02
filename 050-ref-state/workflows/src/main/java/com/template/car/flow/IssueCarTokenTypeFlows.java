@@ -60,7 +60,7 @@ public interface IssueCarTokenTypeFlows {
         @Override
         public SignedTransaction call() throws FlowException {
             final CarTokenType newCar = new CarTokenType(Collections.singletonList(getOurIdentity()),
-                    new UniqueIdentifier(), vin, make, 0, price);
+                    new UniqueIdentifier(), vin, make, 0);
             final TransactionState<CarTokenType> txState = new TransactionState<>(newCar, notary);
             return subFlow(new CreateEvolvableTokens(txState, observers));
         }

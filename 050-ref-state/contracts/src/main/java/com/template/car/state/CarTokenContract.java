@@ -18,8 +18,6 @@ public class CarTokenContract extends EvolvableTokenContract implements Contract
             // Validation rules on our fields.
             require.using("Mileage must start at 0.",
                     outputCarTokenType.getMileage() == 0L);
-            require.using("Price cannot be 0.",
-                    outputCarTokenType.getPrice() > 0L);
             return null;
         });
     }
@@ -38,8 +36,6 @@ public class CarTokenContract extends EvolvableTokenContract implements Contract
                     outputCarTokenType.getMake().equals(inputCarTokenType.getMake()));
             require.using("Mileage cannot be decreased.",
                     outputCarTokenType.getMileage() >= inputCarTokenType.getMileage());
-            require.using("Price cannot be 0.",
-                    outputCarTokenType.getPrice() > 0L);
             return null;
         });
     }
