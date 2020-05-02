@@ -141,6 +141,7 @@ public interface SalesProposalRejectFlows {
             this.progressTracker = progressTracker;
         }
 
+        @SuppressWarnings("unused")
         public RejectFlow(@NotNull final StateAndRef<SalesProposal> proposal,
                           @NotNull final AbstractParty rejecter) {
             this(proposal, rejecter, tracker());

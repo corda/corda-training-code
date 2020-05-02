@@ -5,23 +5,18 @@ import com.r3.corda.lib.accounts.workflows.flows.CreateAccount;
 import com.r3.corda.lib.accounts.workflows.flows.RequestKeyForAccount;
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingInitiator;
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
-import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
-import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
-import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.template.car.flow.CarTokenCourseHelpers;
 import com.template.car.flow.CarTokenTypeConstants;
 import com.template.car.flow.IssueCarToHolderFlows;
 import com.template.car.flow.IssueCarTokenTypeFlows.IssueCarTokenTypeFlow;
-import com.template.car.flow.UpdateCarTokenTypeFlows.UpdateCarTokenTypeFlow;
 import com.template.car.flow.UsdTokenConstants;
 import com.template.car.state.CarTokenType;
 import com.template.proposal.flow.SalesProposalOfferFlows.OfferSimpleFlow;
+import com.template.proposal.flow.SalesProposalRejectFlows.RejectSimpleFlow;
 import com.template.proposal.state.SalesProposal;
 import net.corda.core.concurrent.CordaFuture;
-import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.StateAndRef;
-import net.corda.core.flows.NotaryException;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.AnonymousParty;
 import net.corda.core.identity.Party;
@@ -36,16 +31,14 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.security.PublicKey;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class SalesProposalOfferFlowsTests {
+public class SalesProposalRejectFlowsTests {
     private final MockNetwork network;
     private final StartedMockNode notary;
     private final StartedMockNode usMint;
@@ -54,7 +47,7 @@ public class SalesProposalOfferFlowsTests {
     private final StartedMockNode alice;
     private final StartedMockNode bob;
 
-    public SalesProposalOfferFlowsTests() {
+    public SalesProposalRejectFlowsTests() {
         network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
         notary = network.getDefaultNotaryNode();
         usMint = network.createNode(new MockNodeParameters()
@@ -137,21 +130,58 @@ public class SalesProposalOfferFlowsTests {
         return future.get();
     }
 
-    @SuppressWarnings("SameParameterValue")
-    @NotNull
-    private SignedTransaction updateMileageOn(
-            @NotNull final StateAndRef<CarTokenType> carRef,
-            @SuppressWarnings("SameParameterValue") final long mileage,
-            final long price,
-            @NotNull final List<Party> observers) throws Exception {
-        final UpdateCarTokenTypeFlow flow = new UpdateCarTokenTypeFlow(carRef, mileage, price, observers);
-        final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
+    @Test
+    public void buyerAccountCanRejectSalesProposalAndInformSellerAccount() throws Exception {
+        // Seller is on alice.
+        final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
+        final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
+        informKeys(alice, Collections.singletonList(sellerParty.getOwningKey()), Collections.singletonList(bmwDealer));
+        // Buyer is on bob.
+        final StateAndRef<AccountInfo> buyer = createAccount(bob, "dan");
+        final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
+        informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
+        // The car.
+        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW", 25_000L,
+                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
+                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
+        final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
+                bmwType.getState().getData().toPointer(CarTokenType.class),
+                sellerParty)
+                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
+        // Seller makes an offer.
+        final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
+                bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
+                usMint.getInfo().getLegalIdentities().get(0));
+        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
         network.runNetwork();
-        return future.get();
+        final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
+
+        // Buyer rejects.
+        final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
+                proposal.getState().getData().getLinearId(), buyerParty);
+        final CordaFuture<SignedTransaction> rejectFuture = bob.startFlow(rejectFlow);
+        network.runNetwork();
+        final SignedTransaction rejectTx = rejectFuture.get();
+
+        // Alice got the transaction.
+        final SignedTransaction savedTx = alice.getServices().getValidatedTransactions()
+                .getTransaction(rejectTx.getId());
+        //noinspection ConstantConditions
+        assertTrue(savedTx.getCoreTransaction().getOutputs().isEmpty());
+        assertEquals(1, savedTx.getCoreTransaction().getInputs().size());
+        assertEquals(proposal.getRef(), savedTx.getTx().getInputs().get(0));
+
+        // Alice cannot find the proposal by linear id.
+        final List<StateAndRef<SalesProposal>> foundProposals = alice.getServices().getVaultService().queryBy(
+                SalesProposal.class,
+                new QueryCriteria.LinearStateQueryCriteria()
+                        .withUuid(Collections.singletonList(proposal.getState().getData().getLinearId().getId())))
+                .getStates();
+        assertTrue(foundProposals.isEmpty());
     }
 
     @Test
-    public void accountCanDoSalesProposalAndInformOtherAccount() throws Exception {
+    public void sellerAccountCanRejectSalesProposalAndInformBuyerAccount() throws Exception {
         // Seller is on alice.
         final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
         final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
@@ -168,165 +198,36 @@ public class SalesProposalOfferFlowsTests {
                 bmwType.getState().getData().toPointer(CarTokenType.class),
                 sellerParty)
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
-
+        // Seller makes an offer.
         final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0));
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
         network.runNetwork();
-        final SignedTransaction offerTx = offerFuture.get();
+        final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
+
+        // Seller rejects.
+        final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
+                proposal.getState().getData().getLinearId(), sellerParty);
+        final CordaFuture<SignedTransaction> rejectFuture = alice.startFlow(rejectFlow);
+        network.runNetwork();
+        final SignedTransaction rejectTx = rejectFuture.get();
 
         // Bob got the transaction.
-        final SignedTransaction savedTx = bob.getServices().getValidatedTransactions().getTransaction(offerTx.getId());
+        final SignedTransaction savedTx = bob.getServices().getValidatedTransactions()
+                .getTransaction(rejectTx.getId());
         //noinspection ConstantConditions
-        assertEquals(2, savedTx.getReferences().size());
-        assertEquals(bmwType.getRef(), savedTx.getReferences().get(0));
-        assertEquals(bmw1.getRef(), savedTx.getReferences().get(1));
-        assertTrue(savedTx.getInputs().isEmpty());
-        assertEquals(1, savedTx.getCoreTransaction().getOutputs().size());
-        final SalesProposal proposal = (SalesProposal) savedTx.getTx().outRef(0).getState().getData();
-        assertEquals(sellerParty, proposal.getSeller());
-        assertEquals(buyerParty, proposal.getBuyer());
-        final Amount<IssuedTokenType> expectedPrice = AmountUtilitiesKt.amount(
-                11_000L, new IssuedTokenType(
-                        usMint.getInfo().getLegalIdentities().get(0),
-                        FiatCurrency.Companion.getInstance("USD")));
-        assertEquals(expectedPrice, proposal.getPrice());
-        assertEquals(bmw1, proposal.getAsset());
+        assertTrue(savedTx.getCoreTransaction().getOutputs().isEmpty());
+        assertEquals(1, savedTx.getCoreTransaction().getInputs().size());
+        assertEquals(proposal.getRef(), savedTx.getTx().getInputs().get(0));
 
-        // Bob can find the proposal by linear id.
+        // Bob cannot find the proposal by linear id.
         final List<StateAndRef<SalesProposal>> foundProposals = bob.getServices().getVaultService().queryBy(
                 SalesProposal.class,
                 new QueryCriteria.LinearStateQueryCriteria()
-                        .withUuid(Collections.singletonList(proposal.getLinearId().getId())))
+                        .withUuid(Collections.singletonList(proposal.getState().getData().getLinearId().getId())))
                 .getStates();
-        assertEquals(1, foundProposals.size());
-        assertEquals(proposal, foundProposals.get(0).getState().getData());
-
-        // Bob can find the car type.
-        final List<StateAndRef<CarTokenType>> foundBmwTypes = bob.getServices().getVaultService().queryBy(
-                CarTokenType.class,
-                new QueryCriteria.LinearStateQueryCriteria()
-                        .withUuid(Collections.singletonList(bmwType.getState().getData().getLinearId().getId())))
-                .getStates();
-        assertEquals(1, foundBmwTypes.size());
-        assertEquals("abc124", foundBmwTypes.get(0).getState().getData().getVin());
-
-        // Bob can find the held car.
-        final List<StateAndRef<NonFungibleToken>> foundBmws = bob.getServices().getVaultService().queryBy(
-                NonFungibleToken.class,
-                new QueryCriteria.LinearStateQueryCriteria()
-                        .withUuid(Collections.singletonList(bmw1.getState().getData().getLinearId().getId())))
-                .getStates();
-        assertEquals(1, foundBmws.size());
-        assertEquals(sellerParty, foundBmws.get(0).getState().getData().getHolder());
-    }
-
-    // This test demonstrates that alice needs to have both the TokenType and the NFToken up to date to attach the
-    // NFToken as a reference data.
-    @Test(expected = NotaryException.class)
-    public void accountCannotDoSalesProposalIfMileageHasChanged() throws Throwable {
-        // Seller is on alice.
-        final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
-        final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
-        informKeys(alice, Collections.singletonList(sellerParty.getOwningKey()), Collections.singletonList(bmwDealer));
-        // Buyer is on bob.
-        final StateAndRef<AccountInfo> buyer = createAccount(bob, "dan");
-        final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
-        informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
-        // The car.
-        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW", 25_000L,
-                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
-                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
-        final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
-                bmwType.getState().getData().toPointer(CarTokenType.class),
-                sellerParty)
-                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
-        // Dmv changes the car without informing the seller or alice.
-        updateMileageOn(bmwType, 8_000L, 22_000L, Collections.emptyList());
-
-        final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
-                bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
-                usMint.getInfo().getLegalIdentities().get(0));
-        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
-        try {
-            offerFuture.get();
-        } catch (ExecutionException e) {
-            throw e.getCause();
-        }
-    }
-
-    @Test
-    public void accountCantDoSalesProposalIfMileageHasChangedAndWasInformed() throws Throwable {
-        // Seller is on alice.
-        final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
-        final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
-        informKeys(alice, Collections.singletonList(sellerParty.getOwningKey()), Collections.singletonList(bmwDealer));
-        // Buyer is on bob.
-        final StateAndRef<AccountInfo> buyer = createAccount(bob, "dan");
-        final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
-        informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
-        // The car.
-        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW", 25_000L,
-                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
-                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
-        final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
-                bmwType.getState().getData().toPointer(CarTokenType.class),
-                sellerParty)
-                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
-        // Dmv changes the car without informing the seller or alice.
-        final StateAndRef<CarTokenType> updatedBmwType = updateMileageOn(bmwType, 8_000L,
-                22_000L, Arrays.asList(
-                        bmwDealer.getInfo().getLegalIdentities().get(0),
-                        alice.getInfo().getLegalIdentities().get(0)))
-                .getCoreTransaction()
-                .outRef(0);
-
-        final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
-                bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
-                usMint.getInfo().getLegalIdentities().get(0));
-        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
-        final SignedTransaction offerTx = offerFuture.get();
-
-        // Bob got the transaction.
-        final SignedTransaction savedTx = bob.getServices().getValidatedTransactions().getTransaction(offerTx.getId());
-        //noinspection ConstantConditions
-        assertEquals(2, savedTx.getReferences().size());
-        // The updated type went in the transaction.
-        assertEquals(updatedBmwType.getRef(), savedTx.getReferences().get(0));
-        assertEquals(bmw1.getRef(), savedTx.getReferences().get(1));
-        assertEquals(1, savedTx.getCoreTransaction().getOutputs().size());
-        final SalesProposal proposal = (SalesProposal) savedTx.getTx().outRef(0).getState().getData();
-        assertEquals(bmw1, proposal.getAsset());
-
-        // Bob can find the proposal by linear id.
-        final List<StateAndRef<SalesProposal>> foundProposals = bob.getServices().getVaultService().queryBy(
-                SalesProposal.class,
-                new QueryCriteria.LinearStateQueryCriteria()
-                        .withUuid(Collections.singletonList(proposal.getLinearId().getId())))
-                .getStates();
-        assertEquals(1, foundProposals.size());
-        assertEquals(proposal, foundProposals.get(0).getState().getData());
-
-        // Bob can find the updated car type.
-        final List<StateAndRef<CarTokenType>> foundBmwTypes = bob.getServices().getVaultService().queryBy(
-                CarTokenType.class,
-                new QueryCriteria.LinearStateQueryCriteria()
-                        .withUuid(Collections.singletonList(bmwType.getState().getData().getLinearId().getId())))
-                .getStates();
-        assertEquals(1, foundBmwTypes.size());
-        assertEquals(8_000L, foundBmwTypes.get(0).getState().getData().getMileage());
-
-        // Bob can find the held car.
-        final List<StateAndRef<NonFungibleToken>> foundBmws = bob.getServices().getVaultService().queryBy(
-                NonFungibleToken.class,
-                new QueryCriteria.LinearStateQueryCriteria()
-                        .withUuid(Collections.singletonList(bmw1.getState().getData().getLinearId().getId())))
-                .getStates();
-        assertEquals(1, foundBmws.size());
-        assertEquals(sellerParty, foundBmws.get(0).getState().getData().getHolder());
+        assertTrue(foundProposals.isEmpty());
     }
 
 }
