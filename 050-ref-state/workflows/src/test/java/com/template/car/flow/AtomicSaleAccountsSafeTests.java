@@ -107,7 +107,6 @@ public class AtomicSaleAccountsSafeTests {
         if (!host.getInfo().getLegalIdentities().get(0).equals(accountInfo.getState().getData().getHost())) {
             throw new IllegalArgumentException("hosts do not match");
         }
-        // TODO how to not use `CordaFuture<Unit>`?
         for (StartedMockNode other : others) {
             final CordaFuture<?> future = host.startFlow(new SyncKeyMappingInitiator(
                     other.getInfo().getLegalIdentities().get(0),

@@ -54,7 +54,7 @@ public interface SalesProposalOfferFlows {
         @NotNull
         private final UniqueIdentifier assetId;
         @NotNull
-        private final Party buyer;
+        private final AbstractParty buyer;
         private final long price;
         @NotNull
         private final TokenType currency;
@@ -64,7 +64,7 @@ public interface SalesProposalOfferFlows {
         private final ProgressTracker progressTracker;
 
         public OfferSimpleFlow(@NotNull final UniqueIdentifier assetId,
-                               @NotNull final Party buyer,
+                               @NotNull final AbstractParty buyer,
                                final long price,
                                @NotNull final String currencyCode,
                                @NotNull final Party issuer,
@@ -87,9 +87,8 @@ public interface SalesProposalOfferFlows {
             this.progressTracker = progressTracker;
         }
 
-        @SuppressWarnings("unused")
         public OfferSimpleFlow(@NotNull final UniqueIdentifier assetId,
-                               @NotNull final Party buyer,
+                               @NotNull final AbstractParty buyer,
                                final long price,
                                @NotNull final String currencyCode,
                                @NotNull final Party issuer) {
