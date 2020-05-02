@@ -15,6 +15,7 @@ import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.r3.corda.lib.tokens.contracts.utilities.AmountUtilitiesKt;
 import com.r3.corda.lib.tokens.money.FiatCurrency;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
+import com.template.car.flow.IssueCarTokenTypeFlows.IssueCarTokenTypeFlow;
 import com.template.car.state.CarTokenType;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.Amount;
