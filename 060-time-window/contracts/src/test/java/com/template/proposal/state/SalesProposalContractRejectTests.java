@@ -133,7 +133,7 @@ public class SalesProposalContractRejectTests {
     }
 
     @Test
-    public void theSellerCanRejectOnlyAfterValidity() {
+    public void theSellerCanRejectOnlyAfterTheExpirationDate() {
         ledger(ledgerServices, ledger -> {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {
@@ -148,7 +148,7 @@ public class SalesProposalContractRejectTests {
                     return txCopy.failsWith("The seller time window should ne after the expiration date");
                 });
 
-                tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
+                tx.timeWindow(tenMinutesAgo.plus(Duration.ofSeconds(1)), Duration.ofMinutes(1));
                 return tx.verifies();
             });
             return null;

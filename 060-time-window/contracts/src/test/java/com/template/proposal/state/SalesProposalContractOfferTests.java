@@ -240,7 +240,7 @@ public class SalesProposalContractOfferTests {
     }
 
     @Test
-    public void theLastValidityShouldBeAfterTheTimeWindow() {
+    public void theExpirationDateShouldBeAfterTheTimeWindow() {
         ledger(ledgerServices, ledger -> {
             final WireTransaction aliceIssueTx = issueToken(ledger, dealer, aliceNFToken);
             ledger.transaction(tx -> {

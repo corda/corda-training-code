@@ -159,7 +159,8 @@ public interface SalesProposalRejectFlows {
                     .addCommand(new SalesProposalContract.Commands.Reject(),
                             Collections.singletonList(rejecter.getOwningKey()));
             if (proposalState.getSeller().equals(rejecter)) {
-                builder.setTimeWindow(TimeWindow.fromOnly(proposalState.getExpirationDate().plus(Duration.ofSeconds(1))));
+                builder.setTimeWindow(TimeWindow.fromOnly(
+                        proposalState.getExpirationDate().plus(Duration.ofSeconds(1))));
             }
 
             progressTracker.setCurrentStep(VERIFYING_TRANSACTION);

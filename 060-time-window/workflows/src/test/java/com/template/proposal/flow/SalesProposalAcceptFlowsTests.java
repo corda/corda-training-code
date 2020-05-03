@@ -383,7 +383,6 @@ public class SalesProposalAcceptFlowsTests {
         network.runNetwork();
         issueFuture.get();
 
-        System.out.println("Xavier, about to wait");
         // Pass the expiration.
         Thread.sleep(11000);
 
