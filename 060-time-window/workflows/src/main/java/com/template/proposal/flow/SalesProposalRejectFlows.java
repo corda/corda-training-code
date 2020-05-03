@@ -15,7 +15,7 @@ import net.corda.core.transactions.TransactionBuilder;
 import net.corda.core.utilities.ProgressTracker;
 import org.jetbrains.annotations.NotNull;
 
-import java.time.Instant;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -159,7 +159,7 @@ public interface SalesProposalRejectFlows {
                     .addCommand(new SalesProposalContract.Commands.Reject(),
                             Collections.singletonList(rejecter.getOwningKey()));
             if (proposalState.getSeller().equals(rejecter)) {
-                builder.setTimeWindow(TimeWindow.fromOnly(Instant.now()));
+                builder.setTimeWindow(TimeWindow.fromOnly(proposalState.getExpirationDate().plus(Duration.ofSeconds(1))));
             }
 
             progressTracker.setCurrentStep(VERIFYING_TRANSACTION);

@@ -145,7 +145,7 @@ public class SalesProposalContractRejectTests {
 
                 tx.tweak(txCopy -> {
                     txCopy.timeWindow(tenMinutesAgo, Duration.ofMinutes(1));
-                    return txCopy.failsWith("The seller can reject only after the last validity");
+                    return txCopy.failsWith("The seller time window should ne after the expiration date");
                 });
 
                 tx.timeWindow(Instant.now(), Duration.ofMinutes(1));

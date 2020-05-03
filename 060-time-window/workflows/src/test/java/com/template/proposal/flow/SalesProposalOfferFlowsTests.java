@@ -16,6 +16,7 @@ import com.template.car.flow.IssueCarTokenTypeFlows.IssueCarTokenTypeFlow;
 import com.template.car.flow.UpdateCarTokenTypeFlows.UpdateCarTokenTypeFlow;
 import com.template.car.flow.UsdTokenConstants;
 import com.template.car.state.CarTokenType;
+import com.template.proposal.flow.SalesProposalOfferFlows.OfferFlowInitiating;
 import com.template.proposal.flow.SalesProposalOfferFlows.OfferSimpleFlow;
 import com.template.proposal.state.SalesProposal;
 import net.corda.core.concurrent.CordaFuture;
@@ -36,6 +37,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.security.PublicKey;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -53,6 +56,7 @@ public class SalesProposalOfferFlowsTests {
     private final StartedMockNode bmwDealer;
     private final StartedMockNode alice;
     private final StartedMockNode bob;
+    private final IssuedTokenType usMintDollars;
 
     public SalesProposalOfferFlowsTests() {
         network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
@@ -65,6 +69,9 @@ public class SalesProposalOfferFlowsTests {
                 .withLegalName(CarTokenTypeConstants.BMW_DEALER));
         alice = network.createNode();
         bob = network.createNode();
+        usMintDollars = new IssuedTokenType(
+                usMint.getInfo().getLegalIdentities().get(0),
+                FiatCurrency.Companion.getInstance("USD"));
     }
 
     @Before
@@ -187,9 +194,7 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(sellerParty, proposal.getSeller());
         assertEquals(buyerParty, proposal.getBuyer());
         final Amount<IssuedTokenType> expectedPrice = AmountUtilitiesKt.amount(
-                11_000L, new IssuedTokenType(
-                        usMint.getInfo().getLegalIdentities().get(0),
-                        FiatCurrency.Companion.getInstance("USD")));
+                11_000L, usMintDollars);
         assertEquals(expectedPrice, proposal.getPrice());
         assertEquals(bmw1, proposal.getAsset());
 
@@ -257,7 +262,7 @@ public class SalesProposalOfferFlowsTests {
     }
 
     @Test
-    public void accountCantDoSalesProposalIfMileageHasChangedAndWasInformed() throws Throwable {
+    public void accountCannotDoSalesProposalIfMileageHasChangedAndWasInformed() throws Throwable {
         // Seller is on alice.
         final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
         final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
@@ -328,4 +333,34 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(sellerParty, foundBmws.get(0).getState().getData().getHolder());
     }
 
+    @Test(expected = NotaryException.class)
+    public void accountCannotDoSalesProposalIfExpirationInThePast() throws Throwable {
+        // Seller is on alice.
+        final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
+        final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
+        informKeys(alice, Collections.singletonList(sellerParty.getOwningKey()), Collections.singletonList(bmwDealer));
+        // Buyer is on bob.
+        final StateAndRef<AccountInfo> buyer = createAccount(bob, "dan");
+        final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
+        informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
+        // The car.
+        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW",
+                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
+                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
+        final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
+                bmwType.getState().getData().toPointer(CarTokenType.class),
+                sellerParty)
+                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
+
+        final OfferFlowInitiating offerFlow = new OfferFlowInitiating(bmw1, buyerParty,
+                AmountUtilitiesKt.amount(11_000L, usMintDollars),
+                Instant.now().minus(Duration.ofSeconds(1)));
+        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
+        network.runNetwork();
+        try {
+            offerFuture.get();
+        } catch (ExecutionException e) {
+            throw e.getCause();
+        }
+    }
 }

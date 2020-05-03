@@ -347,4 +347,54 @@ public class SalesProposalAcceptFlowsTests {
         }
     }
 
+    @Test(expected = NotaryException.class)
+    public void buyerCannotAcceptSalesAfterExpiration() throws Throwable {
+        // Seller is on alice.
+        final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
+        final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
+        informKeys(alice, Collections.singletonList(sellerParty.getOwningKey()), Collections.singletonList(bmwDealer));
+        // Buyer is on bob.
+        final StateAndRef<AccountInfo> buyer = createAccount(bob, "dan");
+        final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
+        informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
+        // The car.
+        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW",
+                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
+                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
+        final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
+                bmwType.getState().getData().toPointer(CarTokenType.class),
+                sellerParty)
+                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
+        // Seller makes an offer.
+        final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
+                bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
+                usMint.getInfo().getLegalIdentities().get(0), 10);
+        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
+        network.runNetwork();
+        final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
+        // Issue dollars to Buyer.
+        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(20_000L, usMintUsd);
+        final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
+                bob.getInfo().getLegalIdentities().get(0), null);
+        final IssueTokens issueFlow = new IssueTokens(
+                Collections.singletonList(usdTokenBob),
+                Collections.emptyList());
+        final CordaFuture<SignedTransaction> issueFuture = usMint.startFlow(issueFlow);
+        network.runNetwork();
+        issueFuture.get();
+
+        System.out.println("Xavier, about to wait");
+        // Pass the expiration.
+        Thread.sleep(11000);
+
+        // Buyer accepts.
+        final AcceptSimpleFlow acceptFlow = new AcceptSimpleFlow(proposal.getState().getData().getLinearId());
+        final CordaFuture<SignedTransaction> acceptFuture = bob.startFlow(acceptFlow);
+        network.runNetwork();
+        try {
+            acceptFuture.get();
+        } catch (ExecutionException e) {
+            throw e.getCause();
+        }
+    }
 }

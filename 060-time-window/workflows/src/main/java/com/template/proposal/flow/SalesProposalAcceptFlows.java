@@ -29,6 +29,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 import java.security.PublicKey;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -185,7 +186,8 @@ public interface SalesProposalAcceptFlows {
                     // Accept the sales proposal
                     .addInputState(proposalRef)
                     .addCommand(new SalesProposalContract.Commands.Accept(),
-                            Collections.singletonList(proposal.getBuyer().getOwningKey()));
+                            Collections.singletonList(proposal.getBuyer().getOwningKey()))
+                    .setTimeWindow(TimeWindow.untilOnly(proposal.getExpirationDate().minus(Duration.ofSeconds(1))));
 
             progressTracker.setCurrentStep(MOVING_ASSET_TO_BUYER);
             MoveTokensUtilitiesKt.addMoveNonFungibleTokens(builder, getServiceHub(),

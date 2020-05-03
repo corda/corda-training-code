@@ -118,6 +118,32 @@ public interface SalesProposalOfferFlows {
     }
 
     /**
+     * Its handler is {@link OfferHandlerFlowInitiated}.
+     */
+    @StartableByRPC
+    @InitiatingFlow
+    class OfferFlowInitiating extends OfferFlow {
+
+        @SuppressWarnings("unused")
+        public OfferFlowInitiating(
+                @NotNull final StateAndRef<NonFungibleToken> asset,
+                @NotNull final AbstractParty buyer,
+                @NotNull final Amount<IssuedTokenType> price,
+                @NotNull final Instant expirationDate,
+                @NotNull final ProgressTracker progressTracker) {
+            super(asset, buyer, price, expirationDate, progressTracker);
+        }
+
+        public OfferFlowInitiating(
+                @NotNull final StateAndRef<NonFungibleToken> asset,
+                @NotNull final AbstractParty buyer,
+                @NotNull final Amount<IssuedTokenType> price,
+                @NotNull final Instant expirationDate) {
+            super(asset, buyer, price, expirationDate);
+        }
+    }
+
+    /**
      * Its handler is {@link OfferHandlerFlow}.
      */
     class OfferFlow extends FlowLogic<SignedTransaction> {
@@ -189,10 +215,10 @@ public interface SalesProposalOfferFlows {
             final SalesProposal proposal = new SalesProposal(new UniqueIdentifier(), asset, buyer, price, expirationDate);
             final TransactionBuilder builder = new TransactionBuilder(asset.getState().getNotary())
                     .addOutputState(proposal)
-                    .setTimeWindow(TimeWindow.untilOnly(expirationDate.minus(Duration.ofSeconds(1))))
                     .addReferenceState(new ReferencedStateAndRef<>(asset))
                     .addCommand(new SalesProposalContract.Commands.Offer(),
-                            Collections.singletonList(proposal.getSeller().getOwningKey()));
+                            Collections.singletonList(proposal.getSeller().getOwningKey()))
+                    .setTimeWindow(TimeWindow.untilOnly(expirationDate.minus(Duration.ofSeconds(1))));
 
             progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
             builder.verify(getServiceHub());
@@ -218,11 +244,18 @@ public interface SalesProposalOfferFlows {
         }
     }
 
-    @SuppressWarnings("unused")
     @InitiatedBy(OfferSimpleFlow.class)
     class OfferSimpleHandlerFlow extends OfferHandlerFlow {
 
         public OfferSimpleHandlerFlow(@NotNull final FlowSession sellerSession) {
+            super(sellerSession);
+        }
+    }
+
+    @InitiatedBy(OfferFlowInitiating.class)
+    class OfferHandlerFlowInitiated extends OfferHandlerFlow {
+
+        public OfferHandlerFlowInitiated(@NotNull final FlowSession sellerSession) {
             super(sellerSession);
         }
     }

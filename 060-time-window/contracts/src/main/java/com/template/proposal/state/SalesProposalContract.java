@@ -53,10 +53,11 @@ public class SalesProposalContract implements Contract {
                         tx.getTimeWindow() != null &&
                                 tx.getTimeWindow().getUntilTime() != null);
                 //noinspection ConstantConditions
-                req.using("The last validity should be in the future",
-                        tx.getTimeWindow().getUntilTime().isBefore(proposal.getLastValidity()));
+                req.using("The expiration date should be after the time window",
+                        tx.getTimeWindow().getUntilTime().isBefore(proposal.getExpirationDate()));
                 req.using("The seller should be the only signer on the offer",
                         Collections.singletonList(proposal.getSeller().getOwningKey()).equals(command.getSigners()));
+
             } else if (command.getValue() instanceof Commands.Accept) {
                 req.using("There should be a single input sales proposal on accept",
                         inSalesProposals.size() == 1);
@@ -83,10 +84,11 @@ public class SalesProposalContract implements Contract {
                         tx.getTimeWindow() != null &&
                                 tx.getTimeWindow().getUntilTime() != null);
                 //noinspection ConstantConditions
-                req.using("The buyer can accept only before the last validity",
-                        tx.getTimeWindow().getUntilTime().isBefore(proposal.getLastValidity()));
+                req.using("The buyer time window should be before the expiration date",
+                        tx.getTimeWindow().getUntilTime().isBefore(proposal.getExpirationDate()));
                 req.using("The buyer should be the only signer on accept",
                         Collections.singletonList(proposal.getBuyer().getOwningKey()).equals(command.getSigners()));
+
             } else if (command.getValue() instanceof Commands.Reject) {
                 req.using("There should be a single input sales proposal on reject",
                         inSalesProposals.size() == 1);
@@ -98,8 +100,8 @@ public class SalesProposalContract implements Contract {
                             tx.getTimeWindow() != null &&
                                     tx.getTimeWindow().getFromTime() != null);
                     //noinspection ConstantConditions
-                    req.using("The seller can reject only after the last validity",
-                            proposal.getLastValidity().isBefore(tx.getTimeWindow().getFromTime()));
+                    req.using("The seller time window should ne after the expiration date",
+                            proposal.getExpirationDate().isBefore(tx.getTimeWindow().getFromTime()));
                     // The buyer can reject at any time.
                 }
                 req.using("The seller or the buyer or both should be signers",

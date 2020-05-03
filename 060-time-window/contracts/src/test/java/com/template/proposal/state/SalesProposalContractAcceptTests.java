@@ -21,7 +21,6 @@ import org.junit.Test;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -294,7 +293,7 @@ public class SalesProposalContractAcceptTests {
 
                 tx.tweak(txCopy -> {
                     txCopy.timeWindow(Instant.now(), Duration.ofMinutes(10));
-                    return txCopy.failsWith("The buyer can accept only before the expiration date");
+                    return txCopy.failsWith("The buyer time window should be before the expiration date");
                 });
 
                 tx.timeWindow(Instant.now(), Duration.ofMinutes(1));

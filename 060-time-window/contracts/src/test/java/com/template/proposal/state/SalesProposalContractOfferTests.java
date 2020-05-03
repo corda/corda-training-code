@@ -252,7 +252,7 @@ public class SalesProposalContractOfferTests {
 
                 tx.tweak(txCopy -> {
                     txCopy.timeWindow(Instant.now(), Duration.ofMinutes(10));
-                    return txCopy.failsWith("The last validity should be in the future");
+                    return txCopy.failsWith("The expiration date should be after the time window");
                 });
 
                 tx.timeWindow(Instant.now(), Duration.ofMinutes(1));
