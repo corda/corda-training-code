@@ -26,12 +26,14 @@ import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.MockNetwork;
 import net.corda.testing.node.MockNodeParameters;
 import net.corda.testing.node.StartedMockNode;
+import net.corda.testing.node.TestClock;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.security.PublicKey;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -208,7 +210,7 @@ public class SalesProposalRejectFlowsTests {
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
 
         // Advance network time
-        Thread.sleep(3_000L);
+        ((TestClock) notary.getServices().getClock()).advanceBy(Duration.ofSeconds(3));
 
         // Seller rejects.
         final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
@@ -261,7 +263,7 @@ public class SalesProposalRejectFlowsTests {
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
 
         // Wait for expiration
-        Thread.sleep(5000);
+        ((TestClock) notary.getServices().getClock()).advanceBy(Duration.ofSeconds(5));
 
         // Seller rejects.
         final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(

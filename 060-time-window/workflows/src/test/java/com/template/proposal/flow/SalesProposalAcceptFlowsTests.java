@@ -35,12 +35,14 @@ import net.corda.core.transactions.SignedTransaction;
 import net.corda.testing.node.MockNetwork;
 import net.corda.testing.node.MockNodeParameters;
 import net.corda.testing.node.StartedMockNode;
+import net.corda.testing.node.TestClock;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.security.PublicKey;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -384,7 +386,7 @@ public class SalesProposalAcceptFlowsTests {
         issueFuture.get();
 
         // Pass the expiration.
-        Thread.sleep(11000);
+        ((TestClock) notary.getServices().getClock()).advanceBy(Duration.ofSeconds(11));
 
         // Buyer accepts.
         final AcceptSimpleFlow acceptFlow = new AcceptSimpleFlow(proposal.getState().getData().getLinearId());
