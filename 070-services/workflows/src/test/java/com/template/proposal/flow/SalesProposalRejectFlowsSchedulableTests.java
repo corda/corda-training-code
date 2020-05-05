@@ -43,7 +43,7 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class SalesProposalRejectFlowsTests {
+public class SalesProposalRejectFlowsSchedulableTests {
     private final MockNetwork network;
     private final StartedMockNode notary;
     private final StartedMockNode usMint;
@@ -52,8 +52,10 @@ public class SalesProposalRejectFlowsTests {
     private final StartedMockNode alice;
     private final StartedMockNode bob;
 
-    public SalesProposalRejectFlowsTests() {
-        network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
+    public SalesProposalRejectFlowsSchedulableTests() {
+        network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters()
+                // To accommodate the schedulable events.
+                .withThreadPerNode(true));
         notary = network.getDefaultNotaryNode();
         usMint = network.createNode(new MockNodeParameters()
                 .withLegalName(UsdTokenConstants.US_MINT));
@@ -69,7 +71,7 @@ public class SalesProposalRejectFlowsTests {
 
     @Before
     public void setup() {
-        network.runNetwork();
+        network.waitQuiescent();
     }
 
     @After
@@ -83,7 +85,7 @@ public class SalesProposalRejectFlowsTests {
             @NotNull final String name) throws Exception {
         final CordaFuture<StateAndRef<? extends AccountInfo>> future = host.startFlow(
                 new CreateAccount(name));
-        network.runNetwork();
+        network.waitQuiescent();
         //noinspection unchecked
         return (StateAndRef<AccountInfo>) future.get();
     }
@@ -93,7 +95,7 @@ public class SalesProposalRejectFlowsTests {
             @NotNull final StartedMockNode host,
             @NotNull final AccountInfo forWhom) throws Exception {
         final CordaFuture<AnonymousParty> future = host.startFlow(new RequestKeyForAccount(forWhom));
-        network.runNetwork();
+        network.waitQuiescent();
         return future.get();
     }
 
@@ -108,7 +110,7 @@ public class SalesProposalRejectFlowsTests {
                             .distinct()
                             .map(AnonymousParty::new)
                             .collect(Collectors.toList())));
-            network.runNetwork();
+            network.waitQuiescent();
             future.get();
         }
     }
@@ -121,7 +123,7 @@ public class SalesProposalRejectFlowsTests {
         final IssueCarTokenTypeFlow flow = new IssueCarTokenTypeFlow(notary.getInfo().getLegalIdentities().get(0),
                 vin, make, observers);
         final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
-        network.runNetwork();
+        network.waitQuiescent();
         return future.get();
     }
 
@@ -132,62 +134,19 @@ public class SalesProposalRejectFlowsTests {
         final IssueCarToHolderFlows.IssueCarToHolderFlow flow = new IssueCarToHolderFlows.IssueCarToHolderFlow(
                 car, bmwDealer.getInfo().getLegalIdentities().get(0), holder);
         final CordaFuture<SignedTransaction> future = bmwDealer.startFlow(flow);
-        network.runNetwork();
+        network.waitQuiescent();
         return future.get();
     }
 
     @Test
-    public void buyerAccountCanRejectSalesProposalAndInformSellerAccount() throws Exception {
-        // Seller is on alice.
-        final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
-        final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
-        informKeys(alice, Collections.singletonList(sellerParty.getOwningKey()), Collections.singletonList(bmwDealer));
-        // Buyer is on bob.
-        final StateAndRef<AccountInfo> buyer = createAccount(bob, "dan");
-        final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
-        informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
-        // The car.
-        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW",
-                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
-                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
-        final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
-                bmwType.getState().getData().toPointer(CarTokenType.class),
-                sellerParty)
-                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
-        // Seller makes an offer.
-        final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
-                bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
-                usMint.getInfo().getLegalIdentities().get(0), 3600);
-        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
-        final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
-
-        // Buyer rejects.
-        final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
-                proposal.getState().getData().getLinearId(), buyerParty);
-        final CordaFuture<SignedTransaction> rejectFuture = bob.startFlow(rejectFlow);
-        network.runNetwork();
-        final SignedTransaction rejectTx = rejectFuture.get();
-
-        // Alice got the transaction.
-        final SignedTransaction savedTx = alice.getServices().getValidatedTransactions()
-                .getTransaction(rejectTx.getId());
-        //noinspection ConstantConditions
-        assertTrue(savedTx.getCoreTransaction().getOutputs().isEmpty());
-        assertEquals(1, savedTx.getCoreTransaction().getInputs().size());
-        assertEquals(proposal.getRef(), savedTx.getTx().getInputs().get(0));
-
-        // Alice cannot find the proposal by linear id.
-        final List<StateAndRef<SalesProposal>> foundProposals = alice.getServices().getVaultService().queryBy(
-                SalesProposal.class,
-                new QueryCriteria.LinearStateQueryCriteria()
-                        .withUuid(Collections.singletonList(proposal.getState().getData().getLinearId().getId())))
-                .getStates();
-        assertTrue(foundProposals.isEmpty());
+    public void salesProposalSchedulableFlowNameIsCorrect() {
+        assertEquals(
+                RejectSimpleFlow.class.getName(),
+                SalesProposal.SCHEDULED_FLOW);
     }
 
     @Test
-    public void sellerAccountCanRejectSalesProposalAndInformBuyerAccount() throws Exception {
+    public void sellerAccountAutomaticallyRejectsSalesProposalAfterExpiration() throws Exception {
         // Seller is on alice.
         final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
         final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
@@ -209,27 +168,14 @@ public class SalesProposalRejectFlowsTests {
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 100);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
 
-        // Advance network time
-        ((TestClock) notary.getServices().getClock()).advanceBy(Duration.ofSeconds(150));
-        // Not advancing alice's time, so as not to trigger the schedulable event.
-
-        // Seller rejects.
-        final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
-                proposal.getState().getData().getLinearId(), sellerParty);
-        final CordaFuture<SignedTransaction> rejectFuture = alice.startFlow(rejectFlow);
-        network.runNetwork();
-        final SignedTransaction rejectTx = rejectFuture.get();
-
-        // Bob got the transaction.
-        final SignedTransaction savedTx = bob.getServices().getValidatedTransactions()
-                .getTransaction(rejectTx.getId());
-        //noinspection ConstantConditions
-        assertTrue(savedTx.getCoreTransaction().getOutputs().isEmpty());
-        assertEquals(1, savedTx.getCoreTransaction().getInputs().size());
-        assertEquals(proposal.getRef(), savedTx.getTx().getInputs().get(0));
+        // Advance a lot to be sure the network has figured it out.
+        ((TestClock) notary.getServices().getClock()).advanceBy(Duration.ofSeconds(2500));
+        ((TestClock) alice.getServices().getClock()).advanceBy(Duration.ofSeconds(2500));
+        network.waitQuiescent(); // Pump the network.
+        // Seller rejects automatically with the scheduled activity.
 
         // Bob cannot find the proposal by linear id.
         final List<StateAndRef<SalesProposal>> foundProposals = bob.getServices().getVaultService().queryBy(
@@ -238,43 +184,5 @@ public class SalesProposalRejectFlowsTests {
                         .withUuid(Collections.singletonList(proposal.getState().getData().getLinearId().getId())))
                 .getStates();
         assertTrue(foundProposals.isEmpty());
-    }
-
-    @Test(expected = NotaryException.class)
-    public void sellerAccountCannotRejectSalesProposalBeforeExpiration() throws Throwable {
-        // Seller is on alice.
-        final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
-        final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
-        informKeys(alice, Collections.singletonList(sellerParty.getOwningKey()), Collections.singletonList(bmwDealer));
-        // Buyer is on bob.
-        final StateAndRef<AccountInfo> buyer = createAccount(bob, "dan");
-        final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
-        informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
-        // The car.
-        final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW",
-                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
-                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
-        final StateAndRef<NonFungibleToken> bmw1 = issueCarTo(
-                bmwType.getState().getData().toPointer(CarTokenType.class),
-                sellerParty)
-                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
-        // Seller makes an offer.
-        final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
-                bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
-                usMint.getInfo().getLegalIdentities().get(0), 3600);
-        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
-        final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
-
-        // Seller tries to reject.
-        final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
-                proposal.getState().getData().getLinearId(), sellerParty);
-        final CordaFuture<SignedTransaction> rejectFuture = alice.startFlow(rejectFlow);
-        network.runNetwork();
-        try {
-            rejectFuture.get();
-        } catch (ExecutionException e) {
-            throw e.getCause();
-        }
     }
 }
