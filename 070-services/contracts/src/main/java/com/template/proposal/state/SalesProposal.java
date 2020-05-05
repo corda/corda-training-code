@@ -18,6 +18,7 @@ import java.util.Objects;
 @BelongsToContract(SalesProposalContract.class)
 public class SalesProposal implements LinearState, SchedulableState {
 
+    // We need to use a string because the flow is in an another module.
     public static final String SCHEDULED_FLOW = "com.template.proposal.flow.SalesProposalRejectFlows$RejectSimpleFlow";
 
     @NotNull
