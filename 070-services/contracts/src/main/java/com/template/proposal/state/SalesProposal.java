@@ -7,7 +7,6 @@ import net.corda.core.contracts.*;
 import net.corda.core.flows.FlowLogicRefFactory;
 import net.corda.core.identity.AbstractParty;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -73,7 +72,7 @@ public class SalesProposal implements LinearState, SchedulableState {
         return linearId;
     }
 
-    @Nullable
+    @NotNull
     @Override
     public ScheduledActivity nextScheduledActivity(
             @NotNull final StateRef thisStateRef,
