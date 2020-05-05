@@ -1,8 +1,9 @@
 package com.template.proposal.service;
 
+import com.r3.corda.lib.tokens.contracts.states.EvolvableTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
-import com.template.car.state.CarTokenType;
-import com.template.proposal.flow.InformCarBuyerFlows;
+import com.r3.corda.lib.tokens.contracts.types.TokenType;
+import com.template.proposal.flow.InformTokenBuyerFlows;
 import com.template.proposal.state.SalesProposal;
 import net.corda.core.contracts.ContractState;
 import net.corda.core.contracts.StateAndRef;
@@ -29,23 +30,23 @@ import java.util.concurrent.Executors;
 @CordaService
 public class SalesProposalService extends SingletonSerializeAsToken {
 
-    private static final int THREAD_COUNT = 8;
+    private static final int THREAD_COUNT = 4;
     private final static Logger log = LoggerFactory.getLogger(SalesProposalService.class);
     private final static Executor executor = Executors.newFixedThreadPool(THREAD_COUNT);
 
     @NotNull
     private final AppServiceHub serviceHub;
     /**
-     * Map key: The CarTokenType.
+     * Map key: The EvolvableTokenType.
      * Map value: The potential buyer.
      */
     @NotNull
-    private final Map<StateAndRef<CarTokenType>, List<AbstractParty>> trackedCarsToBuyers;
+    private final Map<StateAndRef<? extends EvolvableTokenType>, List<AbstractParty>> trackedTypesToBuyers;
 
     @SuppressWarnings("unused")
     public SalesProposalService(@NotNull final AppServiceHub serviceHub) {
         this.serviceHub = serviceHub;
-        this.trackedCarsToBuyers = new HashMap<>();
+        this.trackedTypesToBuyers = new HashMap<>();
         trackAndNotify();
     }
 
@@ -61,18 +62,18 @@ public class SalesProposalService extends SingletonSerializeAsToken {
     }
 
     private void handleUpdate(@NotNull final Vault.Update<ContractState> update) {
-        // For CarTokenType, we care only about the "net" result. For the same id, there may be more than 1 consumed,
+        // For EvolvableTokenType, we care only about the "net" result. For the same id, there may be more than 1 consumed,
         // but if there is any consumed, then there is a single produced.
-        // Map key: CarTokenType linear id
-        // Map value: Tracked and consumed CarTokenType
-        final Map<UniqueIdentifier, StateAndRef<CarTokenType>> toNotify = new HashMap<>();
+        // Map key: EvolvableTokenType linear id
+        // Map value: Tracked and consumed EvolvableTokenType
+        final Map<UniqueIdentifier, StateAndRef<EvolvableTokenType>> toNotify = new HashMap<>();
         // We need to look at consumed first to build the pair in the map.
         update.getConsumed().forEach(it -> {
             if (it.getState().getData() instanceof SalesProposal) {
                 removeProposal((SalesProposal) it.getState().getData());
-            } else if (it.getState().getData() instanceof CarTokenType) {
-                final StateAndRef<CarTokenType> consumed = convertToCar(it);
-                if (trackedCarsToBuyers.get(consumed) != null) {
+            } else if (it.getState().getData() instanceof EvolvableTokenType) {
+                final StateAndRef<EvolvableTokenType> consumed = convertToType(it);
+                if (trackedTypesToBuyers.get(consumed) != null) {
                     final UniqueIdentifier id = consumed.getState().getData().getLinearId();
                     assert toNotify.get(id) == null; // Because it should be the first time we see it.
                     // We will need to notify
@@ -80,24 +81,33 @@ public class SalesProposalService extends SingletonSerializeAsToken {
                 }
             }
         });
+        // Clean the outdated information if a consumed SalesProposal removed a tracking.
+        toNotify.forEach((id, state) -> {
+            if (trackedTypesToBuyers.get(state) == null) toNotify.remove(id);
+        });
         update.getProduced().forEach(it -> {
             if (it.getState().getData() instanceof SalesProposal) {
                 putProposal((SalesProposal) it.getState().getData());
-            } else if (it.getState().getData() instanceof CarTokenType) {
-                final StateAndRef<CarTokenType> produced = convertToCar(it);
-                final StateAndRef<CarTokenType> consumed = toNotify.get(produced.getState().getData().getLinearId());
+            } else if (it.getState().getData() instanceof EvolvableTokenType) {
+                final StateAndRef<EvolvableTokenType> produced = convertToType(it);
+                final UniqueIdentifier id = produced.getState().getData().getLinearId();
+                final StateAndRef<EvolvableTokenType> consumed = toNotify.get(id);
                 if (consumed != null) {
+                    trackedTypesToBuyers.put(produced, trackedTypesToBuyers.get(consumed));
                     notifyUpdate(consumed, produced);
+                    toNotify.remove(id);
                 }
             }
         });
+        // The remaining ones have exited the ledger for good. At the moment, this is impossible.
+        toNotify.forEach((id, state) -> trackedTypesToBuyers.remove(state));
     }
 
     @NotNull
-    public StateAndRef<CarTokenType> convertToCar(@NotNull final StateAndRef<ContractState> state) {
+    public StateAndRef<EvolvableTokenType> convertToType(@NotNull final StateAndRef<ContractState> state) {
         return new StateAndRef<>(
                 new TransactionState<>(
-                        (CarTokenType) state.getState().getData(),
+                        (EvolvableTokenType) state.getState().getData(),
                         state.getState().getContract(),
                         state.getState().getNotary(),
                         state.getState().getEncumbrance(),
@@ -116,63 +126,65 @@ public class SalesProposalService extends SingletonSerializeAsToken {
                 .hasNext();
     }
 
-    @NotNull
-    public StateAndRef<CarTokenType> getCarType(@NotNull final SalesProposal proposal) {
+    @Nullable
+    public StateAndRef<EvolvableTokenType> getTokenType(@NotNull final SalesProposal proposal) {
+        final TokenType type = proposal.getAsset().getState().getData().getTokenType();
+        if (!type.isPointer()) return null;
         //noinspection unchecked
-        return ((TokenPointer<CarTokenType>) proposal.getAsset()
-                .getState().getData()
-                .getTokenType())
+        return ((TokenPointer<EvolvableTokenType>) type)
                 .getPointer()
                 .resolve(serviceHub);
     }
 
     private void putProposal(@NotNull final SalesProposal proposal) {
         // If we are not the seller, we do not need to watch.
-        if (!isMyKey(proposal.getSeller())) {
-            return;
-        }
-        final StateAndRef<CarTokenType> carType = getCarType(proposal);
-        if (trackedCarsToBuyers.get(carType) == null) {
-            trackedCarsToBuyers.put(carType, new ArrayList<>(Collections.singletonList(proposal.getBuyer())));
+        if (!isMyKey(proposal.getSeller())) return;
+        final StateAndRef<EvolvableTokenType> tokenType = getTokenType(proposal);
+        // If it is not evolvable, there is nothing to track.
+        if (tokenType == null) return;
+        final List<AbstractParty> buyers = trackedTypesToBuyers.get(tokenType);
+        if (buyers == null) {
+            trackedTypesToBuyers.put(tokenType, new ArrayList<>(Collections.singletonList(proposal.getBuyer())));
         } else {
-            trackedCarsToBuyers.get(carType).add(proposal.getBuyer());
+            buyers.add(proposal.getBuyer());
         }
     }
 
     private void removeProposal(@NotNull final SalesProposal proposal) {
-        trackedCarsToBuyers.remove(getCarType(proposal));
+        final StateAndRef<EvolvableTokenType> tokenType = getTokenType(proposal);
+        // If it is not evolvable, nothing was tracked in the first place.
+        if (tokenType == null) return;
+        trackedTypesToBuyers.remove(tokenType);
     }
 
     private void notifyUpdate(
-            @NotNull final StateAndRef<CarTokenType> consumed,
-            @NotNull final StateAndRef<CarTokenType> replacement) {
-        final UniqueIdentifier carId = consumed.getState().getData().getLinearId();
-        final List<AbstractParty> buyers = trackedCarsToBuyers.get(consumed);
-        assert buyers != null;
-        trackedCarsToBuyers.put(replacement, buyers);
+            @NotNull final StateAndRef<EvolvableTokenType> consumed,
+            @NotNull final StateAndRef<EvolvableTokenType> replacement) {
+        final UniqueIdentifier stateId = consumed.getState().getData().getLinearId();
+        final List<AbstractParty> buyers = trackedTypesToBuyers.get(consumed);
         final SignedTransaction tx = serviceHub.getValidatedTransactions().getTransaction(
                 replacement.getRef().getTxhash());
+        assert buyers != null;
         assert tx != null; // Should never happen.
-        executor.execute(() -> {
-            for (final AbstractParty buyer : buyers)
-                serviceHub.startTrackedFlow(new InformCarBuyerFlows.Send(buyer, tx))
-                        .getProgress()
-                        .subscribe(
-                                result -> log.info("Notified buyer " + buyer + " of change of " + carId +
-                                        "with result " + result),
-                                e -> log.error("Failed to notify buyer " + buyer + " of change of " + carId, e),
-                                () -> trackedCarsToBuyers.remove(consumed)
-                        );
-        });
+        for (final AbstractParty buyer : buyers)
+            executor.execute(() ->
+                    serviceHub.startTrackedFlow(new InformTokenBuyerFlows.Send(buyer, tx))
+                            .getProgress()
+                            .subscribe(
+                                    result -> log.info("Notified buyer " + buyer + " of change of " + stateId +
+                                            "with result " + result),
+                                    e -> log.error("Failed to notify buyer " + buyer + " of change of " + stateId, e),
+                                    () -> trackedTypesToBuyers.remove(consumed)
+                            ));
     }
 
-    public int getCarTypeCount() {
-        return trackedCarsToBuyers.size();
+    public int getTokenTypeCount() {
+        return trackedTypesToBuyers.size();
     }
 
     @Nullable
-    public List<AbstractParty> getBuyersOf(@NotNull final StateAndRef<CarTokenType> carType) {
-        return trackedCarsToBuyers.get(carType);
+    public List<AbstractParty> getBuyersOf(@NotNull final StateAndRef<? extends EvolvableTokenType> tokenType) {
+        return trackedTypesToBuyers.get(tokenType);
     }
 
 }

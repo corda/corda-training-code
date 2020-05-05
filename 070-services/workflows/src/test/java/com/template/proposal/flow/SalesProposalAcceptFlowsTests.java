@@ -15,14 +15,13 @@ import com.r3.corda.lib.tokens.selection.InsufficientBalanceException;
 import com.r3.corda.lib.tokens.workflows.flows.rpc.IssueTokens;
 import com.template.car.flow.CarTokenCourseHelpers;
 import com.template.car.flow.CarTokenTypeConstants;
-import com.template.car.flow.IssueCarToHolderFlows;
+import com.template.car.flow.IssueCarToHolderFlows.IssueCarToHolderFlow;
 import com.template.car.flow.IssueCarTokenTypeFlows.IssueCarTokenTypeFlow;
 import com.template.car.flow.UpdateCarTokenTypeFlows.UpdateCarTokenTypeFlow;
 import com.template.car.flow.UsdTokenConstants;
 import com.template.car.state.CarTokenType;
 import com.template.proposal.flow.SalesProposalAcceptFlows.AcceptSimpleFlow;
 import com.template.proposal.flow.SalesProposalOfferFlows.OfferSimpleFlow;
-import com.template.proposal.service.SalesProposalService;
 import com.template.proposal.state.SalesProposal;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.Amount;
@@ -50,7 +49,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class SalesProposalAcceptFlowsTests {
     private final MockNetwork network;
@@ -109,7 +109,7 @@ public class SalesProposalAcceptFlowsTests {
         return future.get();
     }
 
-    private void informKeys(
+     private void informKeys(
             @NotNull final StartedMockNode host,
             @NotNull final List<PublicKey> who,
             @NotNull final List<StartedMockNode> others) throws Exception {
@@ -141,7 +141,7 @@ public class SalesProposalAcceptFlowsTests {
     private SignedTransaction issueCarTo(
             @NotNull final TokenPointer<CarTokenType> car,
             @NotNull final AbstractParty holder) throws Exception {
-        final IssueCarToHolderFlows.IssueCarToHolderFlow flow = new IssueCarToHolderFlows.IssueCarToHolderFlow(
+        final IssueCarToHolderFlow flow = new IssueCarToHolderFlow(
                 car, bmwDealer.getInfo().getLegalIdentities().get(0), holder);
         final CordaFuture<SignedTransaction> future = bmwDealer.startFlow(flow);
         network.runNetwork();
@@ -159,6 +159,22 @@ public class SalesProposalAcceptFlowsTests {
         final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
         network.runNetwork();
         return future.get();
+    }
+
+    @SuppressWarnings("UnusedReturnValue")
+    @NotNull
+    private SignedTransaction issueDollars(
+            @NotNull final StartedMockNode owner,
+            final long amount) throws Exception {
+        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(amount, usMintUsd);
+        final FungibleToken usdTokens = new FungibleToken(amountOfUsd,
+                owner.getInfo().getLegalIdentities().get(0), null);
+        final IssueTokens issueFlow = new IssueTokens(
+                Collections.singletonList(usdTokens),
+                Collections.emptyList());
+        final CordaFuture<SignedTransaction> issueFuture = usMint.startFlow(issueFlow);
+        network.runNetwork();
+        return issueFuture.get();
     }
 
     @Test
@@ -187,15 +203,7 @@ public class SalesProposalAcceptFlowsTests {
         network.runNetwork();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
         // Issue dollars to Buyer.
-        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(20_000L, usMintUsd);
-        final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
-                bob.getInfo().getLegalIdentities().get(0), null);
-        final IssueTokens issueFlow = new IssueTokens(
-                Collections.singletonList(usdTokenBob),
-                Collections.emptyList());
-        final CordaFuture<SignedTransaction> issueFuture = usMint.startFlow(issueFlow);
-        network.runNetwork();
-        issueFuture.get();
+        issueDollars(bob, 20_000L);
         // Dmv changes the car with informing the buyer only.
         updateMileageOn(bmwType, 8_000L, 22_000L,
                 Collections.singletonList(bob.getInfo().getLegalIdentities().get(0)));
@@ -270,15 +278,7 @@ public class SalesProposalAcceptFlowsTests {
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
 
         // Issue dollars to Buyer.
-        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(20_000L, usMintUsd);
-        final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
-                bob.getInfo().getLegalIdentities().get(0), null);
-        final IssueTokens issueFlow = new IssueTokens(
-                Collections.singletonList(usdTokenBob),
-                Collections.emptyList());
-        final CordaFuture<SignedTransaction> issueFuture = usMint.startFlow(issueFlow);
-        network.runNetwork();
-        issueFuture.get();
+        issueDollars(bob, 20_000L);
 
         // Dmv changes the car with informing only the seller.
         updateMileageOn(bmwType, 8_000L, 22_000L,
@@ -329,15 +329,7 @@ public class SalesProposalAcceptFlowsTests {
         network.runNetwork();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
         // Issue not enough dollars to buyer.
-        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(10_000L, usMintUsd);
-        final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
-                bob.getInfo().getLegalIdentities().get(0), null);
-        final IssueTokens issueFlow = new IssueTokens(
-                Collections.singletonList(usdTokenBob),
-                Collections.emptyList());
-        final CordaFuture<SignedTransaction> future = usMint.startFlow(issueFlow);
-        network.runNetwork();
-        future.get();
+        issueDollars(bob, 10_000L);
         // Issue irrelevant dollars to buyer.
         final IssuedTokenType monopoly = new IssuedTokenType(bob.getInfo().getLegalIdentities().get(0),
                 FiatCurrency.Companion.getInstance("USD"));
@@ -388,15 +380,7 @@ public class SalesProposalAcceptFlowsTests {
         network.runNetwork();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
         // Issue dollars to Buyer.
-        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(20_000L, usMintUsd);
-        final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
-                bob.getInfo().getLegalIdentities().get(0), null);
-        final IssueTokens issueFlow = new IssueTokens(
-                Collections.singletonList(usdTokenBob),
-                Collections.emptyList());
-        final CordaFuture<SignedTransaction> issueFuture = usMint.startFlow(issueFlow);
-        network.runNetwork();
-        issueFuture.get();
+        issueDollars(bob, 20_000L);
 
         // Pass the expiration.
         ((TestClock) notary.getServices().getClock()).advanceBy(Duration.ofSeconds(11));

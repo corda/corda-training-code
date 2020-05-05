@@ -53,6 +53,7 @@ public class SalesProposalServiceTests {
     private final StartedMockNode bmwDealer;
     private final StartedMockNode alice;
     private final StartedMockNode bob;
+    private final StartedMockNode carly;
     private final IssuedTokenType usMintUsd;
 
     public SalesProposalServiceTests() {
@@ -68,6 +69,8 @@ public class SalesProposalServiceTests {
                 .withLegalName(CordaX500Name.parse("O=Alice, L=Istanbul, C=TR")));
         bob = network.createNode(new MockNodeParameters()
                 .withLegalName(CordaX500Name.parse("O=Bob, L=Paris, C=FR")));
+        carly = network.createNode(new MockNodeParameters()
+                .withLegalName(CordaX500Name.parse("O=Carly, L=Hamburg, C=DE")));
         final TokenType usdTokenType = FiatCurrency.Companion.getInstance("USD");
         usMintUsd = new IssuedTokenType(usMint.getInfo().getLegalIdentities().get(0), usdTokenType);
     }
@@ -176,7 +179,7 @@ public class SalesProposalServiceTests {
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
             final SalesProposalService proposalService = node.getServices().cordaService(SalesProposalService.class);
-            assertEquals(0, proposalService.getCarTypeCount());
+            assertEquals(0, proposalService.getTokenTypeCount());
         });
     }
 
@@ -213,10 +216,10 @@ public class SalesProposalServiceTests {
         // Only alice tracks the car.
         Arrays.asList(dmv, bmwDealer, bob).forEach(node -> {
             final SalesProposalService proposalService = node.getServices().cordaService(SalesProposalService.class);
-            assertEquals(0, proposalService.getCarTypeCount());
+            assertEquals(0, proposalService.getTokenTypeCount());
         });
         final SalesProposalService aliceService = alice.getServices().cordaService(SalesProposalService.class);
-        assertEquals(1, aliceService.getCarTypeCount());
+        assertEquals(1, aliceService.getTokenTypeCount());
         final List<AbstractParty> buyers = aliceService.getBuyersOf(bmwType);
         assertNotNull(buyers);
         assertEquals(1, buyers.size());
@@ -224,15 +227,19 @@ public class SalesProposalServiceTests {
     }
 
     @Test
-    public void whenCarUpdatedItIsSentToBuyer() throws Exception {
+    public void whenCarUpdatedItIsSentToBuyers() throws Exception {
         // Seller is on alice.
-        final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
+        final StateAndRef<AccountInfo> seller = createAccount(alice, "dan");
         final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
         informKeys(alice, Collections.singletonList(sellerParty.getOwningKey()), Collections.singletonList(bmwDealer));
-        // Buyer is on bob.
-        final StateAndRef<AccountInfo> buyer = createAccount(bob, "dan");
-        final AnonymousParty buyerParty = requestNewKey(bob, buyer.getState().getData());
-        informKeys(bob, Collections.singletonList(buyerParty.getOwningKey()), Collections.singletonList(alice));
+        // Buyer1 is on bob.
+        final StateAndRef<AccountInfo> emma = createAccount(bob, "emma");
+        final AnonymousParty emmaParty = requestNewKey(bob, emma.getState().getData());
+        informKeys(bob, Collections.singletonList(emmaParty.getOwningKey()), Collections.singletonList(alice));
+        // Buyer2 is on carly.
+        final StateAndRef<AccountInfo> fabio = createAccount(this.carly, "fabio");
+        final AnonymousParty fabioParty = requestNewKey(this.carly, fabio.getState().getData());
+        informKeys(this.carly, Collections.singletonList(fabioParty.getOwningKey()), Collections.singletonList(alice));
         // The car.
         final StateAndRef<CarTokenType> bmwType = createNewBmw("abc124", "BMW",
                 Arrays.asList(
@@ -245,13 +252,21 @@ public class SalesProposalServiceTests {
                 sellerParty)
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
 
-        // Seller makes an offer.
-        final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
-                bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
+        // Seller makes offer1.
+        final OfferSimpleFlow offer1Flow = new OfferSimpleFlow(
+                bmw1.getState().getData().getLinearId(), emmaParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 3600);
-        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
+        final CordaFuture<SignedTransaction> offer1Future = alice.startFlow(offer1Flow);
         network.runNetwork();
-        offerFuture.get().getTx().outRef(0);
+        offer1Future.get();
+
+        // Seller makes offer2.
+        final OfferSimpleFlow offer2Flow = new OfferSimpleFlow(
+                bmw1.getState().getData().getLinearId(), fabioParty, 10_000L, "USD",
+                usMint.getInfo().getLegalIdentities().get(0), 3600);
+        final CordaFuture<SignedTransaction> offer2Future = alice.startFlow(offer2Flow);
+        network.runNetwork();
+        offer2Future.get();
 
         // Dmv changes the car with informing only the seller.
         final SignedTransaction mileageTx = updateMileageOn(bmwType, 8_000L, 22_000L,
@@ -259,25 +274,28 @@ public class SalesProposalServiceTests {
         final StateAndRef<CarTokenType> newBmwType = mileageTx.getCoreTransaction().outRef(0);
 
         // Only alice tracks the updated car.
-        Arrays.asList(dmv, bmwDealer, bob).forEach(node -> {
+        Arrays.asList(dmv, bmwDealer, bob, this.carly).forEach(node -> {
             final SalesProposalService proposalService = node.getServices().cordaService(SalesProposalService.class);
-            assertEquals(0, proposalService.getCarTypeCount());
+            assertEquals(0, proposalService.getTokenTypeCount());
         });
         final SalesProposalService aliceService = alice.getServices().cordaService(SalesProposalService.class);
-        assertEquals(1, aliceService.getCarTypeCount());
+        assertEquals(1, aliceService.getTokenTypeCount());
         assertNull(aliceService.getBuyersOf(bmwType));
         final List<AbstractParty> buyers = aliceService.getBuyersOf(newBmwType);
         assertNotNull(buyers);
-        assertEquals(1, buyers.size());
-        assertEquals(buyerParty, buyers.get(0));
+        assertEquals(2, buyers.size());
+        assertEquals(emmaParty, buyers.get(0));
+        assertEquals(fabioParty, buyers.get(1));
 
-        // Bob got the updated car type with new mileage.
-        final List<StateAndRef<CarTokenType>> updatedBmwTypes = bob.getServices().getVaultService()
-                .queryBy(CarTokenType.class, new QueryCriteria.LinearStateQueryCriteria()
-                        .withUuid(Collections.singletonList(bmwType.getState().getData().getLinearId().getId())))
-                .getStates();
-        assertEquals(1, updatedBmwTypes.size());
-        assertEquals(8_000L, updatedBmwTypes.get(0).getState().getData().getMileage());
+        // Bob and carly got the updated car type with new mileage.
+        Arrays.asList(bob, this.carly).forEach(node -> {
+            final List<StateAndRef<CarTokenType>> updatedBmwTypes = node.getServices().getVaultService()
+                    .queryBy(CarTokenType.class, new QueryCriteria.LinearStateQueryCriteria()
+                            .withUuid(Collections.singletonList(bmwType.getState().getData().getLinearId().getId())))
+                    .getStates();
+            assertEquals(1, updatedBmwTypes.size());
+            assertEquals(8_000L, updatedBmwTypes.get(0).getState().getData().getMileage());
+        });
     }
 
     @Test
@@ -320,7 +338,7 @@ public class SalesProposalServiceTests {
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
             final SalesProposalService proposalService = node.getServices().cordaService(SalesProposalService.class);
-            assertEquals(0, proposalService.getCarTypeCount());
+            assertEquals(0, proposalService.getTokenTypeCount());
         });
     }
 
@@ -366,7 +384,7 @@ public class SalesProposalServiceTests {
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
             final SalesProposalService proposalService = node.getServices().cordaService(SalesProposalService.class);
-            assertEquals(0, proposalService.getCarTypeCount());
+            assertEquals(0, proposalService.getTokenTypeCount());
         });
     }
 
@@ -420,7 +438,7 @@ public class SalesProposalServiceTests {
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
             final SalesProposalService proposalService = node.getServices().cordaService(SalesProposalService.class);
-            assertEquals(0, proposalService.getCarTypeCount());
+            assertEquals(0, proposalService.getTokenTypeCount());
         });
     }
 
@@ -470,7 +488,7 @@ public class SalesProposalServiceTests {
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
             final SalesProposalService proposalService = node.getServices().cordaService(SalesProposalService.class);
-            assertEquals(0, proposalService.getCarTypeCount());
+            assertEquals(0, proposalService.getTokenTypeCount());
         });
     }
 
@@ -529,7 +547,7 @@ public class SalesProposalServiceTests {
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
             final SalesProposalService proposalService = node.getServices().cordaService(SalesProposalService.class);
-            assertEquals(0, proposalService.getCarTypeCount());
+            assertEquals(0, proposalService.getTokenTypeCount());
         });
     }
 }

@@ -28,6 +28,7 @@ public interface SalesProposalRejectFlows {
     @SchedulableFlow
     class RejectSimpleFlow extends FlowLogic<SignedTransaction> {
 
+        private final static ProgressTracker.Step FILTERING_MY_KEYS = new ProgressTracker.Step("Making sure the vault has the private key.");
         private final static ProgressTracker.Step FETCHING_PROPOSAL = new ProgressTracker.Step("Fetching proposal from the vault.");
         private final static ProgressTracker.Step PASSING_ON = new ProgressTracker.Step("Passing on to RejectFlow.") {
             @NotNull
@@ -39,7 +40,7 @@ public interface SalesProposalRejectFlows {
 
         @NotNull
         public static ProgressTracker tracker() {
-            return new ProgressTracker(FETCHING_PROPOSAL, PASSING_ON);
+            return new ProgressTracker(FILTERING_MY_KEYS, FETCHING_PROPOSAL, PASSING_ON);
         }
 
         @NotNull
@@ -73,6 +74,7 @@ public interface SalesProposalRejectFlows {
         @Suspendable
         @Override
         public SignedTransaction call() throws FlowException {
+            progressTracker.setCurrentStep(FILTERING_MY_KEYS);
             if (!getServiceHub().getKeyManagementService().filterMyKeys(
                     Collections.singleton(rejecter.getOwningKey())).iterator().hasNext()) {
                 throw new FlowException("Rejecter key unknown");
