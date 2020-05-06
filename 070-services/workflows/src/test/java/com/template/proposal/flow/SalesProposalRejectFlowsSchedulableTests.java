@@ -17,7 +17,6 @@ import com.template.proposal.flow.SalesProposalRejectFlows.RejectSimpleFlow;
 import com.template.proposal.state.SalesProposal;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndRef;
-import net.corda.core.flows.NotaryException;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.AnonymousParty;
 import net.corda.core.identity.CordaX500Name;
@@ -37,7 +36,6 @@ import java.security.PublicKey;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;

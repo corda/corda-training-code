@@ -57,7 +57,8 @@ public class SalesProposalServiceTests {
     private final IssuedTokenType usMintUsd;
 
     public SalesProposalServiceTests() {
-        network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
+        network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters()
+                .withThreadPerNode(true));
         notary = network.getDefaultNotaryNode();
         usMint = network.createNode(new MockNodeParameters()
                 .withLegalName(UsdTokenConstants.US_MINT));
@@ -77,7 +78,7 @@ public class SalesProposalServiceTests {
 
     @Before
     public void setup() {
-        network.runNetwork();
+        network.waitQuiescent();
     }
 
     @After
@@ -91,7 +92,7 @@ public class SalesProposalServiceTests {
             @NotNull final String name) throws Exception {
         final CordaFuture<StateAndRef<? extends AccountInfo>> future = host.startFlow(
                 new CreateAccount(name));
-        network.runNetwork();
+        network.waitQuiescent();
         //noinspection unchecked
         return (StateAndRef<AccountInfo>) future.get();
     }
@@ -101,7 +102,7 @@ public class SalesProposalServiceTests {
             @NotNull final StartedMockNode host,
             @NotNull final AccountInfo forWhom) throws Exception {
         final CordaFuture<AnonymousParty> future = host.startFlow(new RequestKeyForAccount(forWhom));
-        network.runNetwork();
+        network.waitQuiescent();
         return future.get();
     }
 
@@ -116,7 +117,7 @@ public class SalesProposalServiceTests {
                             .distinct()
                             .map(AnonymousParty::new)
                             .collect(Collectors.toList())));
-            network.runNetwork();
+            network.waitQuiescent();
             future.get();
         }
     }
@@ -129,7 +130,7 @@ public class SalesProposalServiceTests {
         final IssueCarTokenTypeFlows.IssueCarTokenTypeFlow flow = new IssueCarTokenTypeFlows.IssueCarTokenTypeFlow(notary.getInfo().getLegalIdentities().get(0),
                 vin, make, observers);
         final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
-        network.runNetwork();
+        network.waitQuiescent();
         return future.get();
     }
 
@@ -140,7 +141,7 @@ public class SalesProposalServiceTests {
         final IssueCarToHolderFlows.IssueCarToHolderFlow flow = new IssueCarToHolderFlows.IssueCarToHolderFlow(
                 car, bmwDealer.getInfo().getLegalIdentities().get(0), holder);
         final CordaFuture<SignedTransaction> future = bmwDealer.startFlow(flow);
-        network.runNetwork();
+        network.waitQuiescent();
         return future.get();
     }
 
@@ -153,7 +154,7 @@ public class SalesProposalServiceTests {
             @NotNull final List<Party> observers) throws Exception {
         final UpdateCarTokenTypeFlows.UpdateCarTokenTypeFlow flow = new UpdateCarTokenTypeFlows.UpdateCarTokenTypeFlow(carRef, mileage, price, observers);
         final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
-        network.runNetwork();
+        network.waitQuiescent();
         return future.get();
     }
 
@@ -175,6 +176,8 @@ public class SalesProposalServiceTests {
                         bob.getInfo().getLegalIdentities().get(0)))
                 .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0);
         issueCarTo(bmwType.getState().getData().toPointer(CarTokenType.class), sellerParty);
+
+        network.waitQuiescent();
 
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
@@ -210,8 +213,10 @@ public class SalesProposalServiceTests {
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         offerFuture.get();
+
+        network.waitQuiescent();
 
         // Only alice tracks the car.
         Arrays.asList(dmv, bmwDealer, bob).forEach(node -> {
@@ -257,7 +262,7 @@ public class SalesProposalServiceTests {
                 bmw1.getState().getData().getLinearId(), emmaParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offer1Future = alice.startFlow(offer1Flow);
-        network.runNetwork();
+        network.waitQuiescent();
         offer1Future.get();
 
         // Seller makes offer2.
@@ -265,13 +270,15 @@ public class SalesProposalServiceTests {
                 bmw1.getState().getData().getLinearId(), fabioParty, 10_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offer2Future = alice.startFlow(offer2Flow);
-        network.runNetwork();
+        network.waitQuiescent();
         offer2Future.get();
 
         // Dmv changes the car with informing only the seller.
         final SignedTransaction mileageTx = updateMileageOn(bmwType, 8_000L, 22_000L,
                 Collections.singletonList(alice.getInfo().getLegalIdentities().get(0)));
         final StateAndRef<CarTokenType> newBmwType = mileageTx.getCoreTransaction().outRef(0);
+
+        network.waitQuiescent();
 
         // Only alice tracks the updated car.
         Arrays.asList(dmv, bmwDealer, bob, this.carly).forEach(node -> {
@@ -321,19 +328,29 @@ public class SalesProposalServiceTests {
                 .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0);
 
         // Seller makes an offer.
-        final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
+        final OfferSimpleFlow offerFlow1 = new OfferSimpleFlow(
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 3600);
-        final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
-        final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
+        final CordaFuture<SignedTransaction> offer1Future = alice.startFlow(offerFlow1);
+        network.waitQuiescent();
+        final StateAndRef<SalesProposal> proposal1 = offer1Future.get().getTx().outRef(0);
 
         // Buyer rejects.
         final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
-                proposal.getState().getData().getLinearId(), buyerParty);
+                proposal1.getState().getData().getLinearId(), buyerParty);
         final CordaFuture<SignedTransaction> rejectFuture = bob.startFlow(rejectFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         rejectFuture.get();
+
+        // Seller makes another offer. This one to pump the network.
+        final OfferSimpleFlow offerFlow2 = new OfferSimpleFlow(
+                bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
+                usMint.getInfo().getLegalIdentities().get(0), 3600);
+        final CordaFuture<SignedTransaction> offer2Future = alice.startFlow(offerFlow2);
+        network.waitQuiescent();
+        final StateAndRef<SalesProposal> proposal2 = offer2Future.get().getTx().outRef(0);
+
+        network.waitQuiescent();
 
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
@@ -343,7 +360,7 @@ public class SalesProposalServiceTests {
     }
 
     @Test
-    public void whenSellerRejectsTrackerRemoves() throws Exception {
+    public void whenSellerAutoRejectsTrackerRemoves() throws Exception {
         // Seller is on alice.
         final StateAndRef<AccountInfo> seller = createAccount(alice, "carly");
         final AnonymousParty sellerParty = requestNewKey(alice, seller.getState().getData());
@@ -367,18 +384,20 @@ public class SalesProposalServiceTests {
         // Seller makes an offer.
         final OfferSimpleFlow offerFlow = new OfferSimpleFlow(
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
-                usMint.getInfo().getLegalIdentities().get(0), 3600);
+                usMint.getInfo().getLegalIdentities().get(0), 100);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
 
-        ((TestClock) notary.getServices().getClock()).advanceBy(Duration.ofSeconds(3610));
+        ((TestClock) notary.getServices().getClock()).advanceBy(Duration.ofSeconds(200));
+        ((TestClock) alice.getServices().getClock()).advanceBy(Duration.ofSeconds(200));
+        network.waitQuiescent();
 
         // Seller rejects.
         final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
                 proposal.getState().getData().getLinearId(), sellerParty);
         final CordaFuture<SignedTransaction> rejectFuture = alice.startFlow(rejectFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         rejectFuture.get();
 
         // No one is tracking.
@@ -415,7 +434,7 @@ public class SalesProposalServiceTests {
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
 
         // Issue dollars to Buyer.
@@ -426,14 +445,16 @@ public class SalesProposalServiceTests {
                 Collections.singletonList(usdTokenBob),
                 Collections.emptyList());
         final CordaFuture<SignedTransaction> issueFuture = usMint.startFlow(issueFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         issueFuture.get();
 
         // Buyer accepts.
         final AcceptSimpleFlow acceptFlow = new AcceptSimpleFlow(proposal.getState().getData().getLinearId());
         final CordaFuture<SignedTransaction> acceptFuture = bob.startFlow(acceptFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         acceptFuture.get();
+
+        network.waitQuiescent();
 
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
@@ -469,7 +490,7 @@ public class SalesProposalServiceTests {
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
 
         // Dmv changes the car with informing only the seller.
@@ -480,10 +501,10 @@ public class SalesProposalServiceTests {
         final RejectSimpleFlow rejectFlow = new RejectSimpleFlow(
                 proposal.getState().getData().getLinearId(), buyerParty);
         final CordaFuture<SignedTransaction> rejectFuture = bob.startFlow(rejectFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         rejectFuture.get();
 
-        assertTrue(alice.getServices().getVaultService().queryBy(SalesProposal.class).getStates().isEmpty());
+        network.waitQuiescent();
 
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {
@@ -519,7 +540,7 @@ public class SalesProposalServiceTests {
                 bmw1.getState().getData().getLinearId(), buyerParty, 11_000L, "USD",
                 usMint.getInfo().getLegalIdentities().get(0), 3600);
         final CordaFuture<SignedTransaction> offerFuture = alice.startFlow(offerFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         final StateAndRef<SalesProposal> proposal = offerFuture.get().getTx().outRef(0);
 
         // Dmv changes the car with informing only the seller.
@@ -535,14 +556,16 @@ public class SalesProposalServiceTests {
                 Collections.singletonList(usdTokenBob),
                 Collections.emptyList());
         final CordaFuture<SignedTransaction> issueFuture = usMint.startFlow(issueFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         issueFuture.get();
 
         // Buyer accepts.
         final AcceptSimpleFlow acceptFlow = new AcceptSimpleFlow(proposal.getState().getData().getLinearId());
         final CordaFuture<SignedTransaction> acceptFuture = bob.startFlow(acceptFlow);
-        network.runNetwork();
+        network.waitQuiescent();
         acceptFuture.get();
+
+        network.waitQuiescent();
 
         // No one is tracking.
         Arrays.asList(dmv, bmwDealer, alice, bob).forEach(node -> {

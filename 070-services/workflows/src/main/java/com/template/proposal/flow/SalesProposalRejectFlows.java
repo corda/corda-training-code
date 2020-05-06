@@ -167,7 +167,6 @@ public interface SalesProposalRejectFlows {
             builder.verify(getServiceHub());
 
             progressTracker.setCurrentStep(SIGNING_TRANSACTION);
-            System.out.println("Xavier rejecting " + getOurIdentity().getName());
             final SignedTransaction rejectTx = getServiceHub().signInitialTransaction(
                     builder, rejecter.getOwningKey());
 
