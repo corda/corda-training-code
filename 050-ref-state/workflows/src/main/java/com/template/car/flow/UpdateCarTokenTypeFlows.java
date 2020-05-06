@@ -20,7 +20,7 @@ public interface UpdateCarTokenTypeFlows {
 
     /**
      * This flow can be started on the command-line with:
-     * flow start UpdateCarTokenTypeFlows$UpdateCarTokenTypeSimpleFlow carTypeId: abc-1..., mileage: 20000, price: 400, observers: [ PartyA ]
+     * flow start UpdateCarTokenTypeFlows$UpdateCarTokenTypeSimpleFlow carTypeId: abc-1..., mileage: 20000, observers: [ PartyA ]
      */
     @StartableByRPC
     class UpdateCarTokenTypeSimpleFlow extends FlowLogic<SignedTransaction> {
@@ -28,14 +28,12 @@ public interface UpdateCarTokenTypeFlows {
         @NotNull
         private final UniqueIdentifier carTypeId;
         private final long mileage;
-        private final long price;
         @NotNull
         private final List<Party> observers;
 
         public UpdateCarTokenTypeSimpleFlow(
                 @NotNull final UniqueIdentifier carTypeId,
                 final long mileage,
-                final long price,
                 @NotNull final List<Party> observers) {
             //noinspection ConstantConditions
             if (carTypeId == null) throw new NullPointerException("The carTypeId cannot be null");
@@ -43,7 +41,6 @@ public interface UpdateCarTokenTypeFlows {
             if (observers == null) throw new NullPointerException("The observers cannot be null");
             this.carTypeId = carTypeId;
             this.mileage = mileage;
-            this.price = price;
             this.observers = observers;
         }
 
@@ -54,7 +51,7 @@ public interface UpdateCarTokenTypeFlows {
                     new LinearPointer<>(carTypeId, CarTokenType.class, false),
                     0);
             final StateAndRef<CarTokenType> carRef = carPointer.getPointer().resolve(getServiceHub());
-            return subFlow(new UpdateCarTokenTypeFlow(carRef, mileage, price, observers));
+            return subFlow(new UpdateCarTokenTypeFlow(carRef, mileage, observers));
         }
     }
 
@@ -64,14 +61,12 @@ public interface UpdateCarTokenTypeFlows {
         @NotNull
         private final StateAndRef<CarTokenType> carRef;
         private final long mileage;
-        private final long price;
         @NotNull
         private final List<Party> observers;
 
         public UpdateCarTokenTypeFlow(
                 @NotNull final StateAndRef<CarTokenType> carRef,
                 final long mileage,
-                final long price,
                 @NotNull final List<Party> observers) {
             //noinspection ConstantConditions
             if (carRef == null) throw new NullPointerException("The carRef cannot be null");
@@ -79,7 +74,6 @@ public interface UpdateCarTokenTypeFlows {
             if (observers == null) throw new NullPointerException("The observers cannot be null");
             this.carRef = carRef;
             this.mileage = mileage;
-            this.price = price;
             this.observers = observers;
         }
 
