@@ -13,6 +13,7 @@ import net.corda.core.identity.AbstractParty;
 import net.corda.core.node.AppServiceHub;
 import net.corda.core.node.services.CordaService;
 import net.corda.core.node.services.Vault;
+import net.corda.core.node.services.vault.QueryCriteria;
 import net.corda.core.serialization.SingletonSerializeAsToken;
 import net.corda.core.transactions.SignedTransaction;
 import org.jetbrains.annotations.NotNull;
@@ -53,7 +54,11 @@ public class SalesProposalService extends SingletonSerializeAsToken {
     private void trackAndNotify() {
         // We track before we collect the current stuff.
         // It would be more pleasant to have 2 trackBy, but this does not work as they compete for the db connection.
-        serviceHub.getVaultService().trackBy(ContractState.class).getUpdates().subscribe(
+        serviceHub.getVaultService()
+                .trackBy(
+                        ContractState.class,
+                        new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL))
+                .getUpdates().subscribe(
                 this::handleUpdate,
                 error -> log.error("In ContractState tracking", error),
                 () -> log.info("ContractState updates closed!"));
