@@ -14,8 +14,7 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.*;
 
 public class SalesProposalTests {
 
@@ -88,7 +87,7 @@ public class SalesProposalTests {
         final UniqueIdentifier linearId = new UniqueIdentifier();
         final SalesProposal proposal = new SalesProposal(linearId, aliceRef1, carly, amount1);
         assertEquals(linearId, proposal.getLinearId());
-        assertEquals(aliceRef1, proposal.getAsset());
+        assertTrue(proposal.isSameAsset(aliceRef1));
         assertEquals(alice, proposal.getSeller());
         assertEquals(carly, proposal.getBuyer());
         assertEquals(amount1, proposal.getPrice());

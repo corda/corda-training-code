@@ -5,6 +5,7 @@ import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import net.corda.core.contracts.*;
 import net.corda.core.identity.AbstractParty;
+import net.corda.core.serialization.ConstructorForDeserialization;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -17,7 +18,7 @@ public class SalesProposal implements LinearState {
     @NotNull
     private final UniqueIdentifier linearId;
     @NotNull
-    private final StateAndRef<NonFungibleToken> asset;
+    private final StaticPointer<NonFungibleToken> asset;
     @NotNull
     private final UniqueIdentifier assetId;
     @NotNull
@@ -27,25 +28,45 @@ public class SalesProposal implements LinearState {
     @NotNull
     private final Amount<IssuedTokenType> price;
 
+    @ConstructorForDeserialization
     public SalesProposal(
             @NotNull final UniqueIdentifier linearId,
-            @NotNull final StateAndRef<NonFungibleToken> asset,
+            @NotNull final StaticPointer<NonFungibleToken> asset,
+            @NotNull final UniqueIdentifier assetId,
+            @NotNull final AbstractParty seller,
             @NotNull final AbstractParty buyer,
             @NotNull final Amount<IssuedTokenType> price) {
         //noinspection ConstantConditions
         if (linearId == null) throw new NullPointerException("linearId cannot be null");
         //noinspection ConstantConditions
-        if (asset == null) throw new NullPointerException("assetId cannot be null");
+        if (asset == null) throw new NullPointerException("asset cannot be null");
+        //noinspection ConstantConditions
+        if (assetId == null) throw new NullPointerException("assetId cannot be null");
+        //noinspection ConstantConditions
+        if (seller == null) throw new NullPointerException("seller cannot be null");
         //noinspection ConstantConditions
         if (buyer == null) throw new NullPointerException("buyer cannot be null");
         //noinspection ConstantConditions
         if (price == null) throw new NullPointerException("price cannot be null");
         this.linearId = linearId;
         this.asset = asset;
-        this.assetId = asset.getState().getData().getLinearId();
-        this.seller = asset.getState().getData().getHolder();
+        this.assetId = assetId;
+        this.seller = seller;
         this.buyer = buyer;
         this.price = price;
+    }
+
+    public SalesProposal(
+            @NotNull final UniqueIdentifier linearId,
+            @NotNull final StateAndRef<NonFungibleToken> asset,
+            @NotNull final AbstractParty buyer,
+            @NotNull final Amount<IssuedTokenType> price) {
+        this(linearId,
+                new StaticPointer<>(asset.getRef(), NonFungibleToken.class),
+                asset.getState().getData().getLinearId(),
+                asset.getState().getData().getHolder(),
+                buyer,
+                price);
     }
 
     @NotNull
@@ -61,7 +82,7 @@ public class SalesProposal implements LinearState {
     }
 
     @NotNull
-    public StateAndRef<NonFungibleToken> getAsset() {
+    public StaticPointer<NonFungibleToken> getAsset() {
         return asset;
     }
 
@@ -85,6 +106,15 @@ public class SalesProposal implements LinearState {
         return price;
     }
 
+    public boolean isSameAsset(@NotNull final StateAndRef<? extends ContractState> asset) {
+        final ContractState aToken = asset.getState().getData();
+        if (!(aToken instanceof NonFungibleToken)) return false;
+        final NonFungibleToken token = (NonFungibleToken) aToken;
+        return this.asset.getPointer().equals(asset.getRef())
+                && this.assetId.equals(token.getLinearId())
+                && this.seller.equals(token.getHolder());
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -92,6 +122,7 @@ public class SalesProposal implements LinearState {
         final SalesProposal that = (SalesProposal) o;
         return linearId.equals(that.linearId) &&
                 asset.equals(that.asset) &&
+                assetId.equals(that.assetId) &&
                 seller.equals(that.seller) &&
                 buyer.equals(that.buyer) &&
                 price.equals(that.price);
@@ -99,6 +130,6 @@ public class SalesProposal implements LinearState {
 
     @Override
     public int hashCode() {
-        return Objects.hash(linearId, asset, seller, buyer, price);
+        return Objects.hash(linearId, asset, assetId, seller, buyer, price);
     }
 }

@@ -179,7 +179,7 @@ public interface SalesProposalAcceptFlows {
         @Override
         public SignedTransaction call() throws FlowException {
             final SalesProposal proposal = proposalRef.getState().getData();
-            final NonFungibleToken asset = proposal.getAsset().getState().getData();
+            final NonFungibleToken asset = proposal.getAsset().resolve(getServiceHub()).getState().getData();
 
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
             final TransactionBuilder builder = new TransactionBuilder(proposalRef.getState().getNotary())

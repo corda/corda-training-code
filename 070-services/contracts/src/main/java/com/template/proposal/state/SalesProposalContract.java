@@ -47,7 +47,7 @@ public class SalesProposalContract implements Contract {
                 final StateAndRef<AbstractToken> refToken = inRefs.get(0);
                 final SalesProposal proposal = outSalesProposals.get(0).getState().getData();
                 req.using("The reference token should match the sales proposal output asset",
-                        proposal.getAsset().equals(refToken));
+                        proposal.isSameAsset(refToken));
                 req.using("The sales proposal offer price should not be zero",
                         0 < proposal.getPrice().getQuantity());
                 req.using("There should be a future-bounded time window",
@@ -65,8 +65,10 @@ public class SalesProposalContract implements Contract {
                 req.using("There should be no sales proposal outputs on accept",
                         outSalesProposals.isEmpty());
                 final SalesProposal proposal = inSalesProposals.get(0).getState().getData();
-                req.using("The asset should be an input on accept",
-                        inNFTokens.contains(proposal.getAsset()));
+                final List<StateAndRef<NonFungibleToken>> candidates = inNFTokens.stream()
+                        .filter(proposal::isSameAsset)
+                        .collect(Collectors.toList());
+                req.using("The asset should be an input on accept", candidates.size() == 1);
                 final List<NonFungibleToken> boughtAsset = outNFTokens.stream()
                         .map(it -> it.getState().getData())
                         .filter(it -> it.getLinearId().equals(proposal.getAssetId()))
