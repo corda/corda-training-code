@@ -5,10 +5,7 @@ import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.template.proposal.flow.InformTokenBuyerFlows;
 import com.template.proposal.state.SalesProposal;
-import net.corda.core.contracts.ContractState;
-import net.corda.core.contracts.StateAndRef;
-import net.corda.core.contracts.TransactionState;
-import net.corda.core.contracts.UniqueIdentifier;
+import net.corda.core.contracts.*;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.node.AppServiceHub;
 import net.corda.core.node.services.CordaService;
@@ -63,7 +60,13 @@ public class SalesProposalService extends SingletonSerializeAsToken {
                 error -> log.error("In ContractState tracking", error),
                 () -> log.info("ContractState updates closed!"));
         serviceHub.getVaultService().queryBy(SalesProposal.class).getStates()
-                .forEach(it -> putProposal(it.getState().getData()));
+                .forEach(it -> {
+                    try {
+                        putProposal(it.getState().getData());
+                    } catch (TransactionResolutionException e) {
+                        log.error("Failed to resolve asset", e);
+                    }
+                });
     }
 
     private void handleUpdate(@NotNull final Vault.Update<ContractState> update) {
@@ -75,7 +78,11 @@ public class SalesProposalService extends SingletonSerializeAsToken {
         // We need to look at consumed first to build the pair in the map.
         update.getConsumed().forEach(it -> {
             if (it.getState().getData() instanceof SalesProposal) {
-                removeProposal((SalesProposal) it.getState().getData());
+                try {
+                    removeProposal((SalesProposal) it.getState().getData());
+                } catch (TransactionResolutionException e) {
+                    log.error("Failed to resolve asset", e);
+                }
             } else if (it.getState().getData() instanceof EvolvableTokenType) {
                 final StateAndRef<EvolvableTokenType> consumed = convertToType(it);
                 if (trackedTypesToBuyers.get(consumed) != null) {
@@ -92,7 +99,11 @@ public class SalesProposalService extends SingletonSerializeAsToken {
         });
         update.getProduced().forEach(it -> {
             if (it.getState().getData() instanceof SalesProposal) {
-                putProposal((SalesProposal) it.getState().getData());
+                try {
+                    putProposal((SalesProposal) it.getState().getData());
+                } catch (TransactionResolutionException e) {
+                    log.error("Failed to resolve asset", e);
+                }
             } else if (it.getState().getData() instanceof EvolvableTokenType) {
                 final StateAndRef<EvolvableTokenType> produced = convertToType(it);
                 final UniqueIdentifier id = produced.getState().getData().getLinearId();
@@ -132,8 +143,9 @@ public class SalesProposalService extends SingletonSerializeAsToken {
     }
 
     @Nullable
-    public StateAndRef<EvolvableTokenType> getTokenType(@NotNull final SalesProposal proposal) {
-        final TokenType type = proposal.getAsset().getState().getData().getTokenType();
+    public StateAndRef<EvolvableTokenType> getTokenType(@NotNull final SalesProposal proposal)
+            throws TransactionResolutionException {
+        final TokenType type = proposal.getAsset().resolve(serviceHub).getState().getData().getTokenType();
         if (!type.isPointer()) return null;
         //noinspection unchecked
         return ((TokenPointer<EvolvableTokenType>) type)
@@ -141,7 +153,7 @@ public class SalesProposalService extends SingletonSerializeAsToken {
                 .resolve(serviceHub);
     }
 
-    private void putProposal(@NotNull final SalesProposal proposal) {
+    private void putProposal(@NotNull final SalesProposal proposal) throws TransactionResolutionException {
         // If we are not the seller, we do not need to watch.
         if (!isMyKey(proposal.getSeller())) return;
         final StateAndRef<EvolvableTokenType> tokenType = getTokenType(proposal);
@@ -155,7 +167,7 @@ public class SalesProposalService extends SingletonSerializeAsToken {
         }
     }
 
-    private void removeProposal(@NotNull final SalesProposal proposal) {
+    private void removeProposal(@NotNull final SalesProposal proposal) throws TransactionResolutionException {
         final StateAndRef<EvolvableTokenType> tokenType = getTokenType(proposal);
         // If it is not evolvable, nothing was tracked in the first place.
         if (tokenType == null) return;
