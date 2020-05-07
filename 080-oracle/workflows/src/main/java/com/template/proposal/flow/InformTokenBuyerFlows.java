@@ -5,6 +5,8 @@ import com.r3.corda.lib.tokens.contracts.states.EvolvableTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.template.proposal.state.SalesProposal;
+import net.corda.core.contracts.StateAndRef;
+import net.corda.core.contracts.TransactionResolutionException;
 import net.corda.core.contracts.UniqueIdentifier;
 import net.corda.core.flows.*;
 import net.corda.core.identity.AbstractParty;
@@ -107,28 +109,47 @@ public interface InformTokenBuyerFlows {
                     .map(EvolvableTokenType::getLinearId)
                     .collect(Collectors.toList());
             if (outputIds.isEmpty()) throw new FlowException("No EvolvableTokenType, stopping");
-
-            // Do we have a SalesProposal with the seller?
-            //noinspection unchecked
-            final boolean relevant = getServiceHub().getVaultService().queryBy(
-                    SalesProposal.class,
-                    new QueryCriteria.LinearStateQueryCriteria().withParticipants(Collections.singletonList(buyer)))
-                    .getStates()
-                    .stream()
-                    .map(proposal -> proposal.getState().getData()
-                            .getAsset().getState().getData().getTokenType())
-                    // You have to account for the fact that some SalesProposals may use a fixed TokenType.
-                    .filter(TokenType::isPointer)
-                    .map(it -> ((TokenPointer<EvolvableTokenType>) it).getPointer()
-                            .resolve(getServiceHub())
-                            .getState().getData().getLinearId())
-                    .anyMatch(outputIds::contains);
-            if (!relevant) throw new FlowException("There is no SalesProposal here for this transaction");
+            if (!isRelevant(buyer, outputIds))
+                throw new FlowException("There is no SalesProposal here for this transaction");
 
             // Finally satisfied that this transaction makes sense.
             getServiceHub().recordTransactions(StatesToRecord.ALL_VISIBLE, Collections.singleton(tx));
             sellerSession.send("Ok");
             return null;
+        }
+
+        private boolean isRelevant(
+                @NotNull final AbstractParty buyer,
+                @NotNull final List<UniqueIdentifier> outputIds) throws TransactionResolutionException {
+            // Do we have a SalesProposal with the seller?
+            final List<StateAndRef<SalesProposal>> states = getServiceHub().getVaultService().queryBy(
+                    SalesProposal.class,
+                    new QueryCriteria.LinearStateQueryCriteria().withParticipants(Collections.singletonList(buyer)))
+                    .getStates();
+            boolean relevant = false;
+            // Because of the checked exception, we cannot use .stream().
+            for (StateAndRef<SalesProposal> salesProposalStateAndRef : states) {
+                final TokenType it = extractTokenType(salesProposalStateAndRef);
+                // You have to account for the fact that some SalesProposals may use a fixed TokenType.
+                if (it.isPointer()) {
+                    //noinspection unchecked
+                    final UniqueIdentifier linearId = ((TokenPointer<EvolvableTokenType>) it).getPointer()
+                            .resolve(getServiceHub())
+                            .getState().getData().getLinearId();
+                    if (outputIds.contains(linearId)) {
+                        relevant = true;
+                        break;
+                    }
+                }
+            }
+            return relevant;
+        }
+
+        @NotNull
+        private TokenType extractTokenType(@NotNull final StateAndRef<SalesProposal> proposal)
+                throws TransactionResolutionException {
+            return proposal.getState().getData()
+                    .getAsset().resolve(getServiceHub()).getState().getData().getTokenType();
         }
     }
 
