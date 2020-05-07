@@ -1,5 +1,9 @@
-This folder contains the project associated with the guided course on Corda. Each folder represents one step as described in the course.
+# Corda Training Project code
 
-The numerical order is kept as close as possible to the order in the course.
+This repository contains the projects that accompany the Corda Training provided by R3 Corda, which you can find at [https://training.corda.net](https://training.corda.net).
 
-If you want to use Kotlin, you need to set `useKotlin=true` in [`constants.properties`](./constants.properties).
+Each folder in this repository represents one step as described in the course.
+
+To use Kotlin to compile these, set `useKotlin=true` in `constants.properties`.
+
+If you have any questions or feedback, you can find us on [https://slack.corda.net](https://slack.corda.net).
