@@ -190,7 +190,7 @@ public class SalesProposalOfferFlowsTests {
                         usMint.getInfo().getLegalIdentities().get(0),
                         FiatCurrency.Companion.getInstance("USD")));
         assertEquals(expectedPrice, proposal.getPrice());
-        assertEquals(bmw1, proposal.getAsset());
+        assertTrue(proposal.isSameAsset(bmw1));
 
         // Bob can find the proposal by linear id.
         final List<StateAndRef<SalesProposal>> foundProposals = bob.getServices().getVaultService().queryBy(
@@ -297,7 +297,7 @@ public class SalesProposalOfferFlowsTests {
         assertEquals(bmw1.getRef(), savedTx.getReferences().get(1));
         assertEquals(1, savedTx.getCoreTransaction().getOutputs().size());
         final SalesProposal proposal = (SalesProposal) savedTx.getTx().outRef(0).getState().getData();
-        assertEquals(bmw1, proposal.getAsset());
+        assertTrue(proposal.isSameAsset(bmw1));
 
         // Bob can find the proposal by linear id.
         final List<StateAndRef<SalesProposal>> foundProposals = bob.getServices().getVaultService().queryBy(

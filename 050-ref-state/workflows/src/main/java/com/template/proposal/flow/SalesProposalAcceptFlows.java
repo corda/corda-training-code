@@ -10,7 +10,6 @@ import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.r3.corda.lib.tokens.selection.TokenQueryBy;
 import com.r3.corda.lib.tokens.selection.database.selector.DatabaseTokenSelection;
 import com.r3.corda.lib.tokens.workflows.flows.move.MoveTokensUtilitiesKt;
-import com.r3.corda.lib.tokens.workflows.types.PartyAndToken;
 import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
 import com.template.proposal.state.SalesProposal;
 import com.template.proposal.state.SalesProposalContract;
@@ -179,7 +178,7 @@ public interface SalesProposalAcceptFlows {
         @Override
         public SignedTransaction call() throws FlowException {
             final SalesProposal proposal = proposalRef.getState().getData();
-            final NonFungibleToken asset = proposal.getAsset().getState().getData();
+            final NonFungibleToken asset = proposal.getAsset().resolve(getServiceHub()).getState().getData();
 
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
             final TransactionBuilder builder = new TransactionBuilder(proposalRef.getState().getNotary())
