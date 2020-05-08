@@ -17,25 +17,29 @@ public class TemperatureContract implements Contract {
     public interface Commands extends CommandData {
         class HowWarm implements Commands {
             @NotNull
-            private final BigDecimal temperature;
+            private final BigDecimal lowBound;
             @NotNull
-            private final BigDecimal tolerance;
+            private final BigDecimal highBound;
 
             public HowWarm(
-                    @NotNull final BigDecimal temperature,
-                    @NotNull final BigDecimal tolerance) {
-                this.temperature = temperature;
-                this.tolerance = tolerance;
+                    @NotNull final BigDecimal lowBound,
+                    @NotNull final BigDecimal highBound) {
+                //noinspection ConstantConditions
+                if (lowBound == null) throw new NullPointerException("lowBound cannot be null");
+                //noinspection ConstantConditions
+                if (highBound == null) throw new NullPointerException("highBound cannot be null");
+                this.lowBound = lowBound;
+                this.highBound = highBound;
             }
 
             @NotNull
-            public BigDecimal getTemperature() {
-                return temperature;
+            public BigDecimal getLowBound() {
+                return lowBound;
             }
 
             @NotNull
-            public BigDecimal getTolerance() {
-                return tolerance;
+            public BigDecimal getHighBound() {
+                return highBound;
             }
 
             @Override
@@ -43,13 +47,13 @@ public class TemperatureContract implements Contract {
                 if (this == o) return true;
                 if (o == null || getClass() != o.getClass()) return false;
                 final HowWarm howWarm = (HowWarm) o;
-                return temperature.equals(howWarm.temperature) &&
-                        tolerance.equals(howWarm.tolerance);
+                return lowBound.equals(howWarm.lowBound) &&
+                        highBound.equals(howWarm.highBound);
             }
 
             @Override
             public int hashCode() {
-                return Objects.hash(temperature, tolerance);
+                return Objects.hash(lowBound, highBound);
             }
         }
     }

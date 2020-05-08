@@ -43,7 +43,7 @@ public class TemperatureOracle extends SingletonSerializeAsToken {
     /**
      * Called when the oracle is requested to provide the current temperature.
      */
-    @Nullable
+    @NotNull
     public BigDecimal getCurrentTemperature() {
         final BigDecimal nextChange = BigDecimal.valueOf(tempGenerator.nextInt(1000))
                 .divide(BigDecimal.valueOf(1000), RoundingMode.HALF_EVEN);
@@ -80,15 +80,14 @@ public class TemperatureOracle extends SingletonSerializeAsToken {
         if (elem instanceof Command && ((Command) elem).getValue() instanceof HowWarm) {
             //noinspection rawtypes
             final HowWarm cmdData = (HowWarm) ((Command) elem).getValue();
-            // Is the difference less than the tolerance?
-            final int comparison = cmdData.getTemperature()
-                    .min(getCurrentTemperature())
-                    .abs()
-                    .compareTo(cmdData.getTolerance());
+            // Is the temperature within the bounds, inclusive?
+            final BigDecimal current = getCurrentTemperature();
+            final int lowBound = cmdData.getLowBound().compareTo(current);
+            final int highBound = current.compareTo(cmdData.getHighBound());
             // Check that the oracle is a required signer.
             //noinspection rawtypes
             return ((Command) elem).getSigners().contains(oracleKey)
-                    && comparison <= 0;
+                    && lowBound <= 0 && highBound <= 0;
         } else if (elem instanceof TimeWindow) {
             final Instant untilTime = ((TimeWindow) elem).getUntilTime();
             return untilTime != null

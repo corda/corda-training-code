@@ -10,12 +10,12 @@ import java.util.List;
 import java.util.Objects;
 
 @BelongsToContract(FxContract.class)
-public class FXState implements ContractState {
+public class FxState implements ContractState {
 
     @NotNull
     private final List<AbstractParty> participants;
 
-    public FXState(@NotNull final List<AbstractParty> participants) {
+    public FxState(@NotNull final List<AbstractParty> participants) {
         //noinspection ConstantConditions
         if (participants == null) throw new NullPointerException("participants cannot be null");
         this.participants = participants;
@@ -31,7 +31,7 @@ public class FXState implements ContractState {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        final FXState that = (FXState) o;
+        final FxState that = (FxState) o;
         return participants.equals(that.participants);
     }
 

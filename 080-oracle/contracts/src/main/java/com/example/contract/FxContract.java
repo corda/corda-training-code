@@ -1,7 +1,7 @@
 package com.example.contract;
 
 import com.example.oracle.FxQuote;
-import com.example.state.FXState;
+import com.example.state.FxState;
 import com.r3.corda.lib.tokens.contracts.states.FungibleToken;
 import net.corda.core.contracts.CommandData;
 import net.corda.core.contracts.CommandWithParties;
@@ -23,7 +23,7 @@ public class FxContract implements Contract {
     @Override
     public void verify(@NotNull final LedgerTransaction tx) throws IllegalArgumentException {
         final CommandWithParties<Commands> command = requireSingleCommand(tx.getCommands(), Commands.class);
-        final List<FXState> fxStates = tx.inputsOfType(FXState.class);
+        final List<FxState> fxStates = tx.inputsOfType(FxState.class);
         final List<FungibleToken> inputs = tx.inputsOfType(FungibleToken.class);
 
         if (command.getValue() instanceof Commands.Swap) {
@@ -38,9 +38,9 @@ public class FxContract implements Contract {
                     .reduce(0L, Math::addExact);
             requireThat(req -> {
                 req.using("There should be a single FxOracleState", fxStates.size() == 1);
-                final FXState fxState = fxStates.get(0);
+                final FxState fxState = fxStates.get(0);
                 req.using("There should be no FxOracleStates in output",
-                        tx.outputsOfType(FXState.class).isEmpty());
+                        tx.outputsOfType(FxState.class).isEmpty());
                 req.using("The inputs should have the right ratio",
                         BigDecimal.valueOf(counterInputTotal)
                                 .divide(BigDecimal.valueOf(baseInputTotal), RoundingMode.HALF_EVEN)

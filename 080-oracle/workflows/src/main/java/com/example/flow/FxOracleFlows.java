@@ -9,9 +9,13 @@ import javafx.util.Pair;
 import net.corda.core.crypto.TransactionSignature;
 import net.corda.core.flows.*;
 import net.corda.core.identity.Party;
-import net.corda.core.transactions.*;
+import net.corda.core.transactions.ComponentVisibilityException;
+import net.corda.core.transactions.FilteredTransaction;
+import net.corda.core.transactions.FilteredTransactionVerificationException;
+import net.corda.core.transactions.WireTransaction;
 import org.jetbrains.annotations.NotNull;
 
+@SuppressWarnings("unused")
 public interface FxOracleFlows {
 
     interface Query {
@@ -88,23 +92,17 @@ public interface FxOracleFlows {
         @StartableByRPC
         class Request extends FlowLogic<TransactionSignature> {
             @NotNull
-            private final TransactionBuilder txBuilder;
-            @NotNull
             private final Party oracle;
             @NotNull
-            private final SignedTransaction tx;
+            private final WireTransaction tx;
 
             public Request(
-                    @NotNull final TransactionBuilder txBuilder,
                     @NotNull final Party oracle,
-                    @NotNull final SignedTransaction tx) {
-                //noinspection ConstantConditions
-                if (txBuilder == null) throw new NullPointerException("txBuilder cannot be null");
+                    @NotNull final WireTransaction tx) {
                 //noinspection ConstantConditions
                 if (oracle == null) throw new NullPointerException("oracle cannot be null");
                 //noinspection ConstantConditions
                 if (tx == null) throw new NullPointerException("tx cannot be null");
-                this.txBuilder = txBuilder;
                 this.oracle = oracle;
                 this.tx = tx;
             }
@@ -116,7 +114,7 @@ public interface FxOracleFlows {
                         .sendAndReceive(TransactionSignature.class, FxOracleUtilities.filter(tx, oracle))
                         .unwrap(sig -> {
                             if (sig.getBy().equals(oracle.getOwningKey())) {
-                                txBuilder.toWireTransaction(getServiceHub()).checkSignature(sig);
+                                tx.checkSignature(sig);
                                 return sig;
                             }
                             throw new IllegalArgumentException("Unexpected key used for signature");

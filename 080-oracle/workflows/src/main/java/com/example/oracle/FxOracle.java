@@ -1,7 +1,6 @@
 package com.example.oracle;
 
 import com.example.contract.FxContract.Commands.Swap;
-import com.example.oracle.FxQuote;
 import com.r3.corda.lib.tokens.contracts.types.TokenType;
 import com.r3.corda.lib.tokens.money.FiatCurrency;
 import javafx.util.Pair;
@@ -55,7 +54,7 @@ public class FxOracle extends SingletonSerializeAsToken {
     }
 
     @Nullable
-    public FxQuote getQuote(@NotNull final Pair<TokenType,TokenType> pair) {
+    public FxQuote getQuote(@NotNull final Pair<TokenType, TokenType> pair) {
         /*
          * This simplified example assumes that the oracle has all of the possible FX rates stored in a map.
          * In a real-world scenario, this would probably be an API call.
@@ -75,7 +74,8 @@ public class FxOracle extends SingletonSerializeAsToken {
      * Called when the oracle is requested to sign over a FX rate.
      */
     @NotNull
-    public TransactionSignature sign(FilteredTransaction ftx) throws FilteredTransactionVerificationException,
+    public TransactionSignature sign(@NotNull final FilteredTransaction ftx)
+            throws FilteredTransactionVerificationException,
             ComponentVisibilityException {
         // Check that the partial Merkle tree is valid.
         ftx.verify();
