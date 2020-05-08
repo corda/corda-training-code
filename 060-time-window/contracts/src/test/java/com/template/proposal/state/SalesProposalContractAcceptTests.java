@@ -38,7 +38,7 @@ public class SalesProposalContractAcceptTests {
     private final Party usMint = new TestIdentity(
             new CordaX500Name("US Mint", "Washington D.C.", "US")).getParty();
     private final Party dealer = new TestIdentity(
-            new CordaX500Name("Dealer", "Dalla", "US")).getParty();
+            new CordaX500Name("Dealer", "Dallas", "US")).getParty();
     private final Party alice = new TestIdentity(
             new CordaX500Name("Alice", "London", "GB")).getParty();
     private final Party bob = new TestIdentity(
