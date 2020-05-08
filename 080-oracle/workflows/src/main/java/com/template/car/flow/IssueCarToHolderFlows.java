@@ -17,6 +17,7 @@ import net.corda.core.transactions.SignedTransaction;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
+import java.util.List;
 
 public interface IssueCarToHolderFlows {
 
@@ -63,20 +64,33 @@ public interface IssueCarToHolderFlows {
         private final Party dealership;
         @NotNull
         private final AbstractParty holder;
+        @NotNull
+        private final List<Party> observers;
 
         public IssueCarToHolderFlow(
                 @NotNull final TokenPointer<CarTokenType> carPointer,
                 @NotNull final Party dealership,
-                @NotNull final AbstractParty holder) {
+                @NotNull final AbstractParty holder,
+                @NotNull final List<Party> observers) {
             //noinspection ConstantConditions
             if (carPointer == null) throw new NullPointerException("The car cannot be null");
             //noinspection ConstantConditions
             if (dealership == null) throw new NullPointerException("The dealership cannot be null");
             //noinspection ConstantConditions
             if (holder == null) throw new NullPointerException("The holder cannot be null");
+            //noinspection ConstantConditions
+            if (observers == null) throw new NullPointerException("The observers cannot be null");
             this.carPointer = carPointer;
             this.dealership = dealership;
             this.holder = holder;
+            this.observers = observers;
+        }
+
+        public IssueCarToHolderFlow(
+                @NotNull final TokenPointer<CarTokenType> carPointer,
+                @NotNull final Party dealership,
+                @NotNull final AbstractParty holder) {
+            this(carPointer, dealership, holder, Collections.emptyList());
         }
 
         @Suspendable
@@ -86,7 +100,7 @@ public interface IssueCarToHolderFlows {
             final NonFungibleToken heldCar = new NonFungibleToken(
                     bmwWithDealership, holder,
                     new UniqueIdentifier(), null);
-            return subFlow(new IssueTokens(Collections.singletonList(heldCar)));
+            return subFlow(new IssueTokens(Collections.singletonList(heldCar), observers));
         }
     }
 
