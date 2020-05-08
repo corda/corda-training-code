@@ -23,7 +23,9 @@ public interface CarTokenCourseHelpers {
                         TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
                         TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
                         TestCordapp.findCordapp("com.template.car.state"),
-                        TestCordapp.findCordapp("com.template.car.flow")))
+                        TestCordapp.findCordapp("com.template.car.flow"),
+                        TestCordapp.findCordapp("com.template.diligence.state"),
+                        TestCordapp.findCordapp("com.template.diligence.flow")))
                 .withNetworkParameters(ParametersUtilitiesKt.testNetworkParameters(
                         Collections.emptyList(), 4
                 ));
