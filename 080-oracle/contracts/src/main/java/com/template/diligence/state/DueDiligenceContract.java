@@ -31,7 +31,13 @@ public class DueDiligenceContract implements Contract {
                         inDueDil.isEmpty());
                 req.using("There should be a single due diligence output on prepare",
                         outDueDil.size() == 1);
-                // No signing is required.
+
+                final DueDiligence diligence = outDueDil.get(0).getState().getData();
+                req.using("The participants should be the only signers on prepare",
+                        diligence.getParticipants().stream()
+                                .map(AbstractParty::getOwningKey)
+                                .collect(Collectors.toList())
+                                .equals(command.getSigners()));
 
             } else if (command.getValue() instanceof Commands.Certify) {
                 req.using("There should be a single due diligence input on certify",

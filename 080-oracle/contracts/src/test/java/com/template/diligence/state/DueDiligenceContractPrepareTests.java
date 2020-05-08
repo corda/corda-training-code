@@ -97,4 +97,34 @@ public class DueDiligenceContractPrepareTests {
         });
     }
 
+    @Test
+    public void allParticipantsMusSign() {
+        ledger(ledgerServices, ledger -> {
+            ledger.transaction(tx -> {
+                tx.output(DueDiligenceContract.DUE_DILIGENCE_CONTRACT_ID,
+                        new DueDiligence(new UniqueIdentifier(), new UniqueIdentifier(),
+                                dmv, Arrays.asList(alice, bob)));
+
+                tx.tweak(txCopy -> {
+                    txCopy.command(Collections.singletonList(alice.getOwningKey()),
+                            new DueDiligenceContract.Commands.Prepare());
+                    txCopy.failsWith("The participants should be the only signers on prepare");
+                    return null;
+                });
+
+                tx.tweak(txCopy -> {
+                    txCopy.command(Collections.singletonList(bob.getOwningKey()),
+                            new DueDiligenceContract.Commands.Prepare());
+                    txCopy.failsWith("The participants should be the only signers on prepare");
+                    return null;
+                });
+
+                tx.command(Arrays.asList(alice.getOwningKey(), bob.getOwningKey()),
+                        new DueDiligenceContract.Commands.Prepare());
+                return tx.verifies();
+            });
+            return null;
+        });
+    }
+
 }
