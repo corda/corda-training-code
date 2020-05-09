@@ -62,9 +62,10 @@ public class SalesProposalContract implements Contract {
                         .filter(proposal::isSameAsset)
                         .collect(Collectors.toList());
                 req.using("The asset should be an input on accept", candidates.size() == 1);
+                final NonFungibleToken inNFToken = inNFTokens.get(0).getState().getData();
                 final List<NonFungibleToken> boughtAsset = outNFTokens.stream()
                         .map(it -> it.getState().getData())
-                        .filter(it -> it.getLinearId().equals(proposal.getAssetId()))
+                        .filter(it -> it.getLinearId().equals(inNFToken.getLinearId()))
                         .collect(Collectors.toList());
                 req.using("The asset should be held by buyer in output on accept",
                         boughtAsset.size() == 1 && boughtAsset.get(0).getHolder().equals(proposal.getBuyer()));

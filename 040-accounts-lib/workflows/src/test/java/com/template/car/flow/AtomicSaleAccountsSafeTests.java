@@ -20,6 +20,7 @@ import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.contracts.UniqueIdentifier;
+import net.corda.core.flows.FlowException;
 import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.AnonymousParty;
 import net.corda.core.identity.Party;
@@ -36,6 +37,7 @@ import java.security.PublicKey;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
@@ -261,6 +263,49 @@ public class AtomicSaleAccountsSafeTests {
                 .map(it -> it.getAmount().getQuantity())
                 .reduce(0L, Math::addExact);
         assertEquals(AmountUtilitiesKt.amount(5_000L, usdTokenType).getQuantity(), paidToEmma);
+    }
+
+    @Test(expected = FlowException.class)
+    public void accountsCannotDoAtomicSaleAccountsSafeIfNotEnough() throws Throwable {
+        final CarTokenType bmw = createNewBmw("abc124", "BMW", 25_000L,
+                Collections.singletonList(bmwDealer.getInfo().getLegalIdentities().get(0)))
+                .getCoreTransaction().outRefsOfType(CarTokenType.class).get(0).getState().getData();
+        final StateAndRef<AccountInfo> dan = createAccount(alice, "dan");
+        final AnonymousParty danParty = requestNewKey(alice, dan.getState().getData());
+        // Inform the dealer about who is dan.
+        inform(alice, danParty.getOwningKey(), Collections.singletonList(bmwDealer));
+        final NonFungibleToken dansBmw = issueCarTo(bmw, danParty)
+                .getCoreTransaction().outRefsOfType(NonFungibleToken.class).get(0)
+                .getState().getData();
+        final StateAndRef<AccountInfo> emma = createAccount(bob, "emma");
+        final AnonymousParty emmaParty = requestNewKey(bob, emma.getState().getData());
+        // Inform the seller's host and the mint about who is emma.
+        inform(bob, emmaParty.getOwningKey(), Arrays.asList(alice, usMint));
+        // Issue not enough dollars to Bob (to make sure we pay only with Emma's dollars) and Emma.
+        final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(15_000L, usMintUsd);
+        final FungibleToken usdTokenBob = new FungibleToken(amountOfUsd,
+                bob.getInfo().getLegalIdentities().get(0), null);
+        final FungibleToken usdTokenEmma = new FungibleToken(amountOfUsd,
+                emmaParty, null);
+        final IssueTokens flow = new IssueTokens(
+                Arrays.asList(usdTokenBob, usdTokenEmma),
+                Collections.emptyList());
+        final CordaFuture<SignedTransaction> future = usMint.startFlow(flow);
+        network.runNetwork();
+        future.get();
+        // Proceed with the sale
+        //noinspection unchecked
+        final TokenPointer<CarTokenType> dansBmwPointer = (TokenPointer<CarTokenType>) dansBmw.getTokenType();
+        final AtomicSaleAccountsSafe.CarSeller saleFlow = new AtomicSaleAccountsSafe.CarSeller(
+                dansBmwPointer, emmaParty, usMintUsd);
+        final CordaFuture<SignedTransaction> saleFuture = alice.startFlow(saleFlow);
+        network.runNetwork();
+        try {
+            saleFuture.get();
+        } catch (ExecutionException e) {
+            throw e.getCause();
+        }
+
     }
 
 }
