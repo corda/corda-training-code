@@ -5,10 +5,9 @@ import com.r3.corda.lib.accounts.workflows.flows.CreateAccount;
 import com.r3.corda.lib.accounts.workflows.flows.RequestKeyForAccount;
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingInitiator;
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
-import com.r3.corda.lib.tokens.contracts.types.IssuedTokenType;
 import com.r3.corda.lib.tokens.contracts.types.TokenPointer;
-import com.r3.corda.lib.tokens.money.FiatCurrency;
-import com.template.car.flow.*;
+import com.template.car.flow.CarTokenCourseHelpers;
+import com.template.car.flow.CarTokenTypeConstants;
 import com.template.car.flow.IssueCarToHolderFlows.IssueCarToHolderFlow;
 import com.template.car.flow.IssueCarTokenTypeFlows.IssueCarTokenTypeFlow;
 import com.template.car.state.CarTokenType;
@@ -38,41 +37,30 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
-public class DiligenceOracleInternalFlowsTests {
+public class DueDiligenceOracleFlowsTests {
     private final MockNetwork network;
-    private final StartedMockNode notary;
-    private final StartedMockNode usMint;
     private final StartedMockNode dmv;
     private final StartedMockNode bmwDealer;
     private final StartedMockNode alice;
-    private final StartedMockNode bob;
-    private final IssuedTokenType usMintDollars;
     private final Party notaryParty;
-    private final Party dmvParty;
     private final Party dealerParty;
     private final Party aliceParty;
     private final Party bobParty;
     private final AbstractParty oracleParty;
 
-    public DiligenceOracleInternalFlowsTests() throws Exception {
+    public DueDiligenceOracleFlowsTests() throws Exception {
         network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
-        notary = network.getDefaultNotaryNode();
+        final StartedMockNode notary = network.getDefaultNotaryNode();
         notaryParty = notary.getInfo().getLegalIdentities().get(0);
-        usMint = network.createNode(new MockNodeParameters()
-                .withLegalName(UsdTokenConstants.US_MINT));
         dmv = network.createNode(new MockNodeParameters()
                 .withLegalName(CarTokenTypeConstants.DMV));
-        dmvParty = dmv.getInfo().getLegalIdentities().get(0);
         bmwDealer = network.createNode(new MockNodeParameters()
                 .withLegalName(CarTokenTypeConstants.BMW_DEALER));
         dealerParty = bmwDealer.getInfo().getLegalIdentities().get(0);
         alice = network.createNode();
         aliceParty = alice.getInfo().getLegalIdentities().get(0);
-        bob = network.createNode();
+        final StartedMockNode bob = network.createNode();
         bobParty = bob.getInfo().getLegalIdentities().get(0);
-        usMintDollars = new IssuedTokenType(
-                usMint.getInfo().getLegalIdentities().get(0),
-                FiatCurrency.Companion.getInstance("USD"));
         oracleParty = requestNewKey(dmv, createAccount(dmv, DiligenceOracle.ACCOUNT_NAME).getState().getData());
         informKeys(dmv, Collections.singletonList(oracleParty.getOwningKey()),
                 Arrays.asList(bmwDealer, alice, bob));
@@ -92,7 +80,7 @@ public class DiligenceOracleInternalFlowsTests {
     @NotNull
     private StateAndRef<AccountInfo> createAccount(
             @NotNull final StartedMockNode host,
-            @NotNull final String name) throws Exception {
+            @SuppressWarnings("SameParameterValue") @NotNull final String name) throws Exception {
         final CordaFuture<StateAndRef<? extends AccountInfo>> future = host.startFlow(
                 new CreateAccount(name));
         network.runNetwork();

@@ -1,6 +1,5 @@
 package com.template.diligence.flow;
 
-import com.template.diligence.state.DiligenceOracleUtilities;
 import com.template.diligence.state.DiligenceOracleUtilities.Status;
 import com.template.diligence.state.DueDiligenceContract.Commands.Certify;
 import net.corda.core.contracts.Command;
@@ -31,16 +30,16 @@ public class DiligenceOracle extends SingletonSerializeAsToken {
     @NotNull
     private final AppServiceHub serviceHub;
     @Nullable
-    private  PublicKey oracleKey;
+    private PublicKey oracleKey;
     // For simplicity, the oracle is storing the statuses in a map.
     private final Map<UniqueIdentifier, Status> freeAndClears = new HashMap<>(10);
 
     @SuppressWarnings("unused")
-    public DiligenceOracle(@NotNull final AppServiceHub serviceHub)
-            throws Exception {
+    public DiligenceOracle(@NotNull final AppServiceHub serviceHub) {
         //noinspection ConstantConditions
         if (serviceHub == null) throw new NullPointerException("serviceHub cannot be null");
         this.serviceHub = serviceHub;
+        // Uncomment these in v4.4 when starting order can be controlled.
 //        final CordaFuture<PublicKey> future = serviceHub.startFlow(new DiligenceOracleFlows.ObtainKey(ACCOUNT_NAME))
 //                .getReturnValue();
 //        this.oracleKey = future.get();
@@ -109,11 +108,6 @@ public class DiligenceOracle extends SingletonSerializeAsToken {
         //noinspection ConstantConditions
         if (oracleKey == null) throw new NullPointerException("oracleKey cannot be null");
         this.oracleKey = oracleKey;
-    }
-
-    @Nullable
-    public PublicKey getOracleKey() {
-        return oracleKey;
     }
 
 }

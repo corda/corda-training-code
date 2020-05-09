@@ -3,6 +3,7 @@ package com.template.diligence.flow;
 import co.paralleluniverse.fibers.Suspendable;
 import com.r3.corda.lib.tokens.contracts.states.NonFungibleToken;
 import com.template.diligence.state.DiligenceOracleUtilities;
+import com.template.diligence.state.DiligenceOracleUtilities.Status;
 import com.template.diligence.state.DueDiligence;
 import com.template.diligence.state.DueDiligenceContract.Commands;
 import net.corda.core.contracts.ContractState;
@@ -34,7 +35,7 @@ public interface DueDiligenceOracleFlows {
     interface Query {
 
         @InitiatingFlow
-        class Request extends FlowLogic<DiligenceOracleUtilities.Status> {
+        class Request extends FlowLogic<Status> {
 
             @NotNull
             private final AbstractParty oracle;
@@ -55,17 +56,17 @@ public interface DueDiligenceOracleFlows {
             @NotNull
             @Suspendable
             @Override
-            public DiligenceOracleUtilities.Status call() throws FlowException {
+            public Status call() throws FlowException {
                 final Party oracleHost = getServiceHub().getIdentityService()
                         .requireWellKnownPartyFromAnonymous(oracle);
-                return initiateFlow(oracleHost).sendAndReceive(DiligenceOracleUtilities.Status.class, tokenId)
+                return initiateFlow(oracleHost).sendAndReceive(Status.class, tokenId)
                         .unwrap(it -> it);
             }
         }
 
         @SuppressWarnings("unused")
         @InitiatedBy(Request.class)
-        class Answer extends FlowLogic<DiligenceOracleUtilities.Status> {
+        class Answer extends FlowLogic<Status> {
 
             @NotNull
             private final FlowSession requesterSession;
@@ -79,8 +80,8 @@ public interface DueDiligenceOracleFlows {
             @NotNull
             @Suspendable
             @Override
-            public DiligenceOracleUtilities.Status call() throws FlowException {
-                final DiligenceOracleUtilities.Status status = getServiceHub().cordaService(DiligenceOracle.class)
+            public Status call() throws FlowException {
+                final Status status = getServiceHub().cordaService(DiligenceOracle.class)
                         .query(requesterSession.receive(UniqueIdentifier.class).unwrap(it -> it));
                 requesterSession.send(status);
                 return status;
@@ -240,10 +241,10 @@ public interface DueDiligenceOracleFlows {
                         // Do I own this token?
                         final DueDiligence output = (DueDiligence) stx.getCoreTransaction().outRef(0)
                                 .getState().getData();
-                        final QueryCriteria criteria = new QueryCriteria.LinearStateQueryCriteria()
+                        final QueryCriteria idCriteria = new QueryCriteria.LinearStateQueryCriteria()
                                 .withUuid(Collections.singletonList(output.getTokenId().getId()));
                         final List<StateAndRef<NonFungibleToken>> found = getServiceHub().getVaultService()
-                                .queryBy(NonFungibleToken.class, criteria).getStates();
+                                .queryBy(NonFungibleToken.class, idCriteria).getStates();
                         if (found.size() != 1)
                             throw new FlowException("Unknown or too many such tokenId");
                         final AbstractParty holder = found.get(0).getState().getData().getHolder();
@@ -438,13 +439,13 @@ public interface DueDiligenceOracleFlows {
             @NotNull
             private final StateAndRef<DueDiligence> dueDilRef;
             @NotNull
-            private final DiligenceOracleUtilities.Status status;
+            private final Status status;
             @NotNull
             private final ProgressTracker progressTracker;
 
             public RequestStraight(
                     @NotNull final StateAndRef<DueDiligence> dueDilRef,
-                    @NotNull final DiligenceOracleUtilities.Status status,
+                    @NotNull final Status status,
                     @NotNull final ProgressTracker progressTracker) {
                 //noinspection ConstantConditions
                 if (dueDilRef == null) throw new NullPointerException("dueDilRef cannot be null");
@@ -459,7 +460,7 @@ public interface DueDiligenceOracleFlows {
 
             public RequestStraight(
                     @NotNull final StateAndRef<DueDiligence> dueDilRef,
-                    @NotNull final DiligenceOracleUtilities.Status status) {
+                    @NotNull final Status status) {
                 this(dueDilRef, status, tracker());
             }
 

@@ -59,7 +59,6 @@ import static org.junit.Assert.assertTrue;
 
 public class SalesProposalAcceptDueDiligenceFlowsTests {
     private final MockNetwork network;
-    private final StartedMockNode notary;
     private final StartedMockNode usMint;
     private final StartedMockNode dmv;
     private final StartedMockNode bmwDealer;
@@ -68,28 +67,24 @@ public class SalesProposalAcceptDueDiligenceFlowsTests {
     private final IssuedTokenType usMintUsd;
     private final Party notaryParty;
     private final Party usMintParty;
-    private final Party dmvParty;
     private final Party dealerParty;
-    private final Party aliceParty;
     private final Party bobParty;
     private final AbstractParty oracleParty;
 
     public SalesProposalAcceptDueDiligenceFlowsTests() throws Exception {
         network = new MockNetwork(CarTokenCourseHelpers.prepareMockNetworkParameters());
-        notary = network.getDefaultNotaryNode();
+        final StartedMockNode notary = network.getDefaultNotaryNode();
         notaryParty = notary.getInfo().getLegalIdentities().get(0);
         usMint = network.createNode(new MockNodeParameters()
                 .withLegalName(UsdTokenConstants.US_MINT));
         usMintParty = usMint.getInfo().getLegalIdentities().get(0);
         dmv = network.createNode(new MockNodeParameters()
                 .withLegalName(CarTokenTypeConstants.DMV));
-        dmvParty = dmv.getInfo().getLegalIdentities().get(0);
         bmwDealer = network.createNode(new MockNodeParameters()
                 .withLegalName(CarTokenTypeConstants.BMW_DEALER));
         dealerParty = bmwDealer.getInfo().getLegalIdentities().get(0);
         alice = network.createNode(new MockNodeParameters()
                 .withLegalName(CordaX500Name.parse("O=Alice, L=Istanbul, C=TR")));
-        aliceParty = alice.getInfo().getLegalIdentities().get(0);
         bob = network.createNode(new MockNodeParameters()
                 .withLegalName(CordaX500Name.parse("O=Bob, L=Paris, C=FR")));
         bobParty = bob.getInfo().getLegalIdentities().get(0);
@@ -168,7 +163,7 @@ public class SalesProposalAcceptDueDiligenceFlowsTests {
             @SuppressWarnings("SameParameterValue") @NotNull final String vin,
             @SuppressWarnings("SameParameterValue") @NotNull final String make,
             @NotNull final List<Party> observers) throws Exception {
-        final IssueCarTokenTypeFlow flow = new IssueCarTokenTypeFlow(notary.getInfo().getLegalIdentities().get(0),
+        final IssueCarTokenTypeFlow flow = new IssueCarTokenTypeFlow(notaryParty,
                 vin, make, observers);
         final CordaFuture<SignedTransaction> future = dmv.startFlow(flow);
         network.runNetwork();
@@ -180,7 +175,7 @@ public class SalesProposalAcceptDueDiligenceFlowsTests {
             @NotNull final TokenPointer<CarTokenType> car,
             @NotNull final AbstractParty holder) throws Exception {
         final IssueCarToHolderFlow flow = new IssueCarToHolderFlow(
-                car, bmwDealer.getInfo().getLegalIdentities().get(0), holder);
+                car, dealerParty, holder);
         final CordaFuture<SignedTransaction> future = bmwDealer.startFlow(flow);
         network.runNetwork();
         return future.get();
@@ -203,7 +198,7 @@ public class SalesProposalAcceptDueDiligenceFlowsTests {
     @NotNull
     private SignedTransaction issueDollars(
             @NotNull final AbstractParty holder,
-            final long amount) throws Exception {
+            @SuppressWarnings("SameParameterValue") final long amount) throws Exception {
         final Amount<IssuedTokenType> amountOfUsd = AmountUtilitiesKt.amount(amount, usMintUsd);
         final FungibleToken usdTokens = new FungibleToken(amountOfUsd,
                 holder, null);
@@ -213,14 +208,6 @@ public class SalesProposalAcceptDueDiligenceFlowsTests {
         final CordaFuture<SignedTransaction> issueFuture = usMint.startFlow(issueFlow);
         network.runNetwork();
         return issueFuture.get();
-    }
-
-    @SuppressWarnings("UnusedReturnValue")
-    @NotNull
-    private SignedTransaction issueDollars(
-            @NotNull final StartedMockNode owner,
-            final long amount) throws Exception {
-        return issueDollars(owner.getInfo().getLegalIdentities().get(0), amount);
     }
 
     @Test

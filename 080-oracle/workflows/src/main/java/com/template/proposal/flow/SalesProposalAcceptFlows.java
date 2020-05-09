@@ -11,6 +11,7 @@ import com.r3.corda.lib.tokens.workflows.utilities.QueryUtilitiesKt;
 import com.template.diligence.flow.DueDiligenceFlowUtils;
 import com.template.diligence.flow.DueDiligenceOracleFlows;
 import com.template.diligence.state.DiligenceOracleUtilities;
+import com.template.diligence.state.DiligenceOracleUtilities.Status;
 import com.template.diligence.state.DueDiligence;
 import com.template.diligence.state.DueDiligenceContract;
 import com.template.diligence.state.DueDiligenceContract.Commands.Certify;
@@ -68,19 +69,22 @@ public interface SalesProposalAcceptFlows {
         @Nullable
         private final UniqueIdentifier dueDiligenceId;
         @Nullable
-        private final DiligenceOracleUtilities.Status diligenceStatus;
+        private final Status diligenceStatus;
         @NotNull
         private final ProgressTracker progressTracker;
 
         public AcceptSimpleFlow(
                 @NotNull final UniqueIdentifier proposalId,
                 @Nullable final UniqueIdentifier dueDiligenceId,
-                @Nullable final DiligenceOracleUtilities.Status diligenceStatus,
+                @Nullable final Status diligenceStatus,
                 @NotNull final ProgressTracker progressTracker) {
             //noinspection ConstantConditions
             if (proposalId == null) throw new NullPointerException("The proposalId cannot be null");
             //noinspection ConstantConditions
             if (progressTracker == null) throw new NullPointerException("The progressTracker cannot be null");
+            if (dueDiligenceId != null && diligenceStatus == null) {
+                throw new NullPointerException("If dueDiligenceId is not null, diligenceStatus cannot be null");
+            }
             this.proposalId = proposalId;
             this.dueDiligenceId = dueDiligenceId;
             this.diligenceStatus = diligenceStatus;
@@ -94,7 +98,7 @@ public interface SalesProposalAcceptFlows {
         public AcceptSimpleFlow(
                 @NotNull final UniqueIdentifier proposalId,
                 @NotNull final UniqueIdentifier dueDiligenceId,
-                @NotNull final DiligenceOracleUtilities.Status diligenceStatus) {
+                @NotNull final Status diligenceStatus) {
             this(proposalId, dueDiligenceId, diligenceStatus, tracker());
         }
 
@@ -173,13 +177,13 @@ public interface SalesProposalAcceptFlows {
         @Nullable
         private final StateAndRef<DueDiligence> dueDiligenceRef;
         @Nullable
-        private final DiligenceOracleUtilities.Status diligenceStatus;
+        private final Status diligenceStatus;
         @NotNull
         private final ProgressTracker progressTracker;
 
         public AcceptFlow(@NotNull final StateAndRef<SalesProposal> proposalRef,
                           @Nullable final StateAndRef<DueDiligence> dueDiligenceRef,
-                          @Nullable final DiligenceOracleUtilities.Status diligenceStatus,
+                          @Nullable final Status diligenceStatus,
                           @NotNull final ProgressTracker progressTracker) {
             //noinspection ConstantConditions
             if (proposalRef == null) throw new NullPointerException("The proposalRef cannot be null");
@@ -197,7 +201,7 @@ public interface SalesProposalAcceptFlows {
         @SuppressWarnings("unused")
         public AcceptFlow(@NotNull final StateAndRef<SalesProposal> proposalRef,
                           @NotNull final StateAndRef<DueDiligence> dueDiligenceRef,
-                          @NotNull final DiligenceOracleUtilities.Status diligenceStatus) {
+                          @NotNull final Status diligenceStatus) {
             this(proposalRef, dueDiligenceRef, diligenceStatus, tracker());
         }
 
