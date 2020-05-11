@@ -34,6 +34,7 @@ public class DueDiligence implements LinearState {
         if (oracle == null) throw new NullPointerException("oracle cannot be null");
         //noinspection ConstantConditions
         if (participants == null) throw new NullPointerException("participants cannot be null");
+        if (participants.isEmpty()) throw new IllegalArgumentException("participants cannot be empty");
         this.linearId = linearId;
         this.tokenId = tokenId;
         this.oracle = oracle;

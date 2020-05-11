@@ -18,6 +18,7 @@ public class FxState implements ContractState {
     public FxState(@NotNull final List<AbstractParty> participants) {
         //noinspection ConstantConditions
         if (participants == null) throw new NullPointerException("participants cannot be null");
+        if (participants.isEmpty()) throw new IllegalArgumentException("participants cannot be empty");
         this.participants = participants;
     }
 
