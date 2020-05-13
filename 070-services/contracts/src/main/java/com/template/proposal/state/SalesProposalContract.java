@@ -103,7 +103,7 @@ public class SalesProposalContract implements Contract {
                             tx.getTimeWindow() != null &&
                                     tx.getTimeWindow().getFromTime() != null);
                     //noinspection ConstantConditions
-                    req.using("The seller time window should ne after the expiration date",
+                    req.using("The seller time window should be after the expiration date",
                             proposal.getExpirationDate().isBefore(tx.getTimeWindow().getFromTime()));
                     // The buyer can reject at any time.
                 }
