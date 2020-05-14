@@ -145,10 +145,14 @@ public class SalesProposalContractRejectTests {
 
                 tx.tweak(txCopy -> {
                     txCopy.timeWindow(tenMinutesAgo, Duration.ofMinutes(1));
-                    return txCopy.failsWith("The seller time window should ne after the expiration date");
+                    return txCopy.failsWith("The seller time window should be after the expiration date");
                 });
 
-                tx.timeWindow(tenMinutesAgo.plus(Duration.ofSeconds(1)), Duration.ofMinutes(1));
+                tx.timeWindow(
+                        tenMinutesAgo
+                                .plus(Duration.ofMinutes(1))
+                                .plus(Duration.ofSeconds(1)),
+                        Duration.ofMinutes(1));
                 return tx.verifies();
             });
             return null;
