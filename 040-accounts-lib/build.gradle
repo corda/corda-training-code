@@ -68,6 +68,12 @@ allprojects {
         reproducibleFileOrder = true
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
+
+    test {
+        maxHeapSize = '2G'
+        maxParallelForks = 4
+        forkEvery = 4
+    }
 }
 
 if (use_kotlin) apply plugin: 'kotlin'
