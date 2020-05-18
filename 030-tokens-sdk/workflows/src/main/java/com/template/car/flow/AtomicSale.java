@@ -130,11 +130,14 @@ public interface AtomicSale {
             final SignedTransaction fullySignedTx = subFlow(new CollectSignaturesFlow(partSignedTx,
                     Collections.singletonList(buyerSession)));
 
-            // Distribute updates of the evolvable car token.
-            subFlow(new UpdateDistributionListFlow(fullySignedTx));
-
             // Finalise the transaction
-            return subFlow(new FinalityFlow(fullySignedTx, Collections.singletonList(buyerSession)));
+            final SignedTransaction notarised = subFlow(new FinalityFlow(
+                    fullySignedTx, Collections.singletonList(buyerSession)));
+
+            // Distribute updates of the evolvable car token.
+            subFlow(new UpdateDistributionListFlow(notarised));
+
+            return notarised;
         }
     }
 
