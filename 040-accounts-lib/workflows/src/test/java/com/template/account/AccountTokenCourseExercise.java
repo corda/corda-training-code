@@ -190,7 +190,7 @@ public class AccountTokenCourseExercise {
                 .getState().getData();
         final StateAndRef<AccountInfo> emma = createAccount(bob, "emma");
         final AnonymousParty emmaParty = requestNewKey(bob, emma.getState().getData());
-        // Inform the seller about who is dan.
+        // Inform the seller about who is emma.
         inform(bob, emmaParty.getOwningKey(), Collections.singletonList(alice));
         final NonFungibleToken emmasBmw = moveCarTo(
                 bmw.toPointer(CarTokenType.class),
