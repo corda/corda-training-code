@@ -24,7 +24,7 @@
     <remote-repository>
       <option name="id" value="maven2" />
       <option name="name" value="maven2" />
-      <option name="url" value="https://ci-artifactory.corda.r3cev.com/artifactory/corda" />
+      <option name="url" value="https://software.r3.com/artifactory/corda" />
     </remote-repository>
     <remote-repository>
       <option name="id" value="maven4" />
@@ -49,12 +49,12 @@
     <remote-repository>
       <option name="id" value="maven6" />
       <option name="name" value="maven6" />
-      <option name="url" value="https://ci-artifactory.corda.r3cev.com/artifactory/corda-lib" />
+      <option name="url" value="https://software.r3.com/artifactory/corda-lib" />
     </remote-repository>
     <remote-repository>
       <option name="id" value="maven7" />
       <option name="name" value="maven7" />
-      <option name="url" value="https://ci-artifactory.corda.r3cev.com/artifactory/corda-lib-dev" />
+      <option name="url" value="https://software.r3.com/artifactory/corda-lib-dev" />
     </remote-repository>
   </component>
 </project>
